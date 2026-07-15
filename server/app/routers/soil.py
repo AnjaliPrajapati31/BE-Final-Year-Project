@@ -1,12 +1,21 @@
 from fastapi import APIRouter
 
-router = APIRouter(
-    prefix="/soil",
-    tags=["Soil Analysis"]
+from app.schemas.soil_schema import (
+    SoilInput,
+    SoilPredictionResponse,
 )
 
-@router.get("/")
-def soil_home():
-    return {
-        "message": "Soil Router Working"
-    }
+from app.services.soil_service import predict_soil
+
+router = APIRouter(
+    prefix="/soil",
+    tags=["Soil Fertility"],
+)
+
+
+@router.post(
+    "/predict",
+    response_model=SoilPredictionResponse,
+)
+def predict(data: SoilInput):
+    return predict_soil(data)

@@ -1,0 +1,1 @@
+from .soil_service import predict_soil

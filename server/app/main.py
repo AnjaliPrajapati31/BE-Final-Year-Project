@@ -1,17 +1,36 @@
 from fastapi import FastAPI
-from app.routers import crop
+from fastapi.middleware.cors import CORSMiddleware
+
 from app.routers import soil
-from app.routers import disease
 
+app = FastAPI(
+    title="AI Agriculture API",
+    version="1.0.0",
+    description="API is running.",
+)
 
-app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-app.include_router(crop.router)
 app.include_router(soil.router)
-app.include_router(disease.router)
+
 
 @app.get("/")
-def home():
+def root():
     return {
-        "message":"Backend Running"
+        "message": "AI Agriculture API Running"
+    }
+
+
+@app.get("/health")
+def health():
+    return {
+        "status": "healthy"
     }

@@ -1,12 +1,9 @@
-import joblib
 import pandas as pd
-from pathlib import Path
 
+from app.core.exceptions import PredictionException
+from app.core.model_loader import soil_model
 from app.schemas.soil_schema import SoilInput
-
-MODEL_PATH = Path("ml_models") / "soilfertility.pkl"
-
-soil_model = joblib.load(MODEL_PATH)
+from app.utils.response import success
 
 LABELS = {
     0: "Low Fertility",
@@ -16,16 +13,22 @@ LABELS = {
 
 
 def predict_soil(data: SoilInput) -> dict:
-    features = pd.DataFrame(
-        [[
-            getattr(data, feature)
-            for feature in soil_model.feature_names_in_
-        ]],
-        columns=soil_model.feature_names_in_,
-    )
+    try:
+        features = pd.DataFrame(
+            [[
+                getattr(data, feature)
+                for feature in soil_model.feature_names_in_
+            ]],
+            columns=soil_model.feature_names_in_,
+        )
 
-    prediction = soil_model.predict(features)[0]
+        prediction = int(soil_model.predict(features)[0])
 
-    return {
-        "prediction": LABELS[int(prediction)]
-    }
+        return success(
+            "Prediction Successful",
+            {
+                "prediction": LABELS.get(prediction, "Unknown"),
+            },
+        )
+    except Exception as exc:
+        raise PredictionException(str(exc)) from exc

@@ -18,5 +18,11 @@ class SoilInput(BaseModel):
     B: float
 
 
-class SoilPredictionResponse(BaseModel):
+class SoilPredictionData(BaseModel):
     prediction: str
+
+
+class SoilPredictionResponse(BaseModel):
+    success: bool
+    message: str
+    data: SoilPredictionData | None = None

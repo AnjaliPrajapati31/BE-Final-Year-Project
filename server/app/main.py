@@ -1,7 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.routers import disease
 from app.routers import soil
+from app.utils.response import success
 
 app = FastAPI(
     title="AI Agriculture API",
@@ -20,17 +22,14 @@ app.add_middleware(
 )
 
 app.include_router(soil.router)
+app.include_router(disease.router)
 
 
 @app.get("/")
 def root():
-    return {
-        "message": "AI Agriculture API Running"
-    }
+    return success("AI Agriculture API Running")
 
 
 @app.get("/health")
 def health():
-    return {
-        "status": "healthy"
-    }
+    return success("Service is healthy", {"status": "healthy"})

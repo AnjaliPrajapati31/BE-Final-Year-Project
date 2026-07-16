@@ -1,12 +1,13 @@
 from fastapi import APIRouter
 
+from app.services.disease_service import predict_disease
+
 router = APIRouter(
     prefix="/disease",
-    tags=["Disease Detection"]
+    tags=["Disease Prediction"],
 )
 
+
 @router.get("/")
-def disease_home():
-    return {
-        "message": "Disease Router Working"
-    }
+def test():
+    return predict_disease()

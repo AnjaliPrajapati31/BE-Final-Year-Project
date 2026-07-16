@@ -1,5 +1,11 @@
 from pydantic import BaseModel
 
 
+class DiseasePredictionData(BaseModel):
+    prediction: str
+
+
 class DiseasePredictionResponse(BaseModel):
-    disease: str
+    success: bool
+    message: str
+    data: DiseasePredictionData | None = None

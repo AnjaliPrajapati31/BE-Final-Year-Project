@@ -1,4 +1,6 @@
 from fastapi import APIRouter
+from fastapi import File
+from fastapi import UploadFile
 
 from app.services.disease_service import predict_disease
 
@@ -8,6 +10,6 @@ router = APIRouter(
 )
 
 
-@router.get("/")
-def test():
-    return predict_disease()
+@router.post("/predict")
+def predict(image: UploadFile = File(...)):
+    return predict_disease(image)

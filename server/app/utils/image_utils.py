@@ -11,7 +11,7 @@ def preprocess_image(image: Image.Image) -> np.ndarray:
     image = image.convert("RGB")
     logger.debug(f"After RGB conversion: {image.size}")
     
-    image = image.resize((128, 128))
+    image = image.resize((128, 128), Image.Resampling.BILINEAR)
     logger.debug(f"After resize: {image.size}")
     
     image = np.array(image)
@@ -20,8 +20,7 @@ def preprocess_image(image: Image.Image) -> np.ndarray:
     image = image.astype("float32")
     logger.debug(f"After float32 cast: dtype={image.dtype}")
     
-    image = image / 255
-    logger.debug(f"After normalization: min={image.min()}, max={image.max()}")
+    logger.debug(f"Pixel range: min={image.min()}, max={image.max()}")
     
     image = np.expand_dims(image, 0)
     logger.debug(f"After expand_dims: shape={image.shape}")

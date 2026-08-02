@@ -5,6 +5,7 @@ venv/
 
 # Python
 __pycache__/
+.pytest_cache/
 *.py[cod]
 *.pyo
 
@@ -15,6 +16,30 @@ dist/
 
 # Dataset
 training/Disease/
+Cauvery2025/
+*.tif
+*.tiff
+
+# Runtime data and secrets
+cache/
+artifacts/
+**/*service-account*.json
+**/*service_account*.json
+**/*credentials*.json
+**/*private-key*.json
+**/*private_key*.json
+*.tmp
+
+# Preserved local training experiments
+training/sickle/S1/
+training/sickle/S2/
+training/sickle/S1_S2/
+training/sickle/notebooks/
+
+# Local-only model provenance and research material
+docs/notebooks/
+references/
+training/sickle/
 # IDE
 .vscode/
 .idea/

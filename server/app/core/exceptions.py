@@ -1,9 +1,6 @@
-from fastapi import HTTPException
-
-
-class PredictionException(HTTPException):
-    def __init__(self, detail: str = "Prediction Failed"):
-        super().__init__(
-            status_code=500,
-            detail=detail,
-        )
+class DomainError(Exception):
+    def __init__(self, code: str, message: str, status_code: int = 422):
+        super().__init__(message)
+        self.code = code
+        self.message = message
+        self.status_code = status_code

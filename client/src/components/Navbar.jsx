@@ -11,12 +11,6 @@ function Navbar() {
         <NavLink to="/" className={linkClass} end>
           Home
         </NavLink>
-        <NavLink to="/soil" className={linkClass}>
-          Soil
-        </NavLink>
-        <NavLink to="/disease" className={linkClass}>
-          Disease
-        </NavLink>
       </nav>
     </header>
   );

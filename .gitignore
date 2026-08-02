@@ -5,6 +5,7 @@ venv/
 
 # Python
 __pycache__/
+.pytest_cache/
 *.py[cod]
 *.pyo
 .Python
@@ -44,3 +45,29 @@ archive/
 PlantVillage/
 archive/PlantVillage/
 **/PlantVillage/
+Cauvery2025/
+**/Cauvery2025/
+*.tif
+*.tiff
+
+# SICKLE runtime data and secrets
+server/cache/
+server/artifacts/
+server/.env
+server/**/*service-account*.json
+server/**/*service_account*.json
+server/**/*credentials*.json
+server/**/*private-key*.json
+server/**/*private_key*.json
+*.tmp
+
+# Preserved local training experiments (not production runtime inputs)
+server/training/sickle/S1/
+server/training/sickle/S2/
+server/training/sickle/S1_S2/
+server/training/sickle/notebooks/
+
+# Local-only model provenance and research material
+server/docs/notebooks/
+server/references/
+server/training/sickle/

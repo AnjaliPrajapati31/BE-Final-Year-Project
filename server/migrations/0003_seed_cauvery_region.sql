@@ -1,0 +1,3 @@
+-- The immutable GeoJSON is inserted by scripts/seed_cauvery_roi.py after its
+-- manifest checksum and geometry have been validated. No fallback polygon is
+-- embedded here because the operational boundary requires explicit approval.

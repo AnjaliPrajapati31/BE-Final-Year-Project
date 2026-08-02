@@ -4,7 +4,7 @@
   "version": 2,
   "status": "approved",
   "source": "Exact common EPSG:4326 bounds and grid of the original Cauvery2025 Sentinel-1 and tiled Sentinel-2 exports",
-  "sha256": "45db4220d5226a7d7eb0604f7eff4ef4fe66283ac38a3d786222b8bacea2e961",
+  "sha256": "4c8f8838f4a344b8d493e30300c9b643fd5698a7a7c0dcfee72ec72db9e7df83",
   "crs": "EPSG:4326",
   "bounds": [79.19996702439761, 10.549994359756484, 80.35008008265584, 11.450645263614716],
   "area_m2": 12518122507.6008,

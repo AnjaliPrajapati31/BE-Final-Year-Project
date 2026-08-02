@@ -66,6 +66,15 @@ def _as_multipolygon(geometry: Polygon | MultiPolygon) -> MultiPolygon:
     return geometry if isinstance(geometry, MultiPolygon) else MultiPolygon([geometry])
 
 
+def canonicalize_geojson_bytes(raw: bytes) -> tuple[dict[str, Any], str]:
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise DomainError("ROI_CONFIGURATION_INVALID", "Cauvery ROI resource is unreadable.", 503) from exc
+    canonical = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    return payload, hashlib.sha256(canonical).hexdigest()
+
+
 def validate_geometry(
     geometry_mapping: dict[str, Any],
     *,
@@ -158,11 +167,11 @@ def load_roi(path: Path) -> tuple[Polygon | MultiPolygon, str]:
         raise DomainError("ROI_CONFIGURATION_INVALID", "Cauvery ROI resource is missing.", 503)
     raw = path.read_bytes()
     try:
-        payload = json.loads(raw)
+        payload, checksum = canonicalize_geojson_bytes(raw)
         geometry_payload = payload.get("geometry") if payload.get("type") == "Feature" else payload
         roi = shape(geometry_payload)
-    except (json.JSONDecodeError, TypeError, ValueError) as exc:
+    except (TypeError, ValueError) as exc:
         raise DomainError("ROI_CONFIGURATION_INVALID", "Cauvery ROI resource is unreadable.", 503) from exc
     if not isinstance(roi, (Polygon, MultiPolygon)) or roi.is_empty or not roi.is_valid:
         raise DomainError("ROI_CONFIGURATION_INVALID", "Cauvery ROI resource is invalid.", 503)
-    return roi, hashlib.sha256(raw).hexdigest()
+    return roi, checksum

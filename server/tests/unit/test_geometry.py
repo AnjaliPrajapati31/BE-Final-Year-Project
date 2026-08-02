@@ -2,7 +2,7 @@ import pytest
 from shapely.geometry import box
 
 from app.core.exceptions import DomainError
-from app.services.sickle.geometry import validate_geometry
+from app.services.sickle.geometry import canonicalize_geojson_bytes, validate_geometry
 
 pytestmark = pytest.mark.unit
 
@@ -27,3 +27,9 @@ def test_self_intersection_is_not_repaired():
     with pytest.raises(DomainError) as error:
         validate({"type": "Polygon", "coordinates": [[[79, 11], [79.001, 11.001], [79.001, 11], [79, 11.001], [79, 11]]]})
     assert error.value.code == "INVALID_GEOMETRY"
+
+
+def test_roi_checksum_is_stable_across_whitespace_and_key_order():
+    compact = b'{"type":"Polygon","coordinates":[[[79.0,11.0],[79.001,11.0],[79.001,11.001],[79.0,11.001],[79.0,11.0]]]}'
+    expanded = b'{\n  "coordinates": [\n    [\n      [79.0, 11.0],\n      [79.001, 11.0],\n      [79.001, 11.001],\n      [79.0, 11.001],\n      [79.0, 11.0]\n    ]\n  ],\n  "type": "Polygon"\n}\n'
+    assert canonicalize_geojson_bytes(compact)[1] == canonicalize_geojson_bytes(expanded)[1]

@@ -4,7 +4,7 @@
   "version": 1,
   "status": "approved",
   "source": "Common verified coverage of the original PILOT_001 S1/S2 32x32 golden-input grid",
-  "sha256": "48a3aefd2e7914ed7901a8e7150cc2985b7ab317a86f57e1f2440e4bdbc07a57",
+  "sha256": "c66d3b8d8b3c39c06d120ab09b7f3264746c51d8f4df1cb4df8a63755837a267",
   "crs": "EPSG:4326",
   "bounds": [79.31549036993538, 10.866381002823378, 79.31836497884456, 10.86925561173256],
   "area_m2": 99941.5386859949,

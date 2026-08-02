@@ -7,6 +7,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.config import settings
+from app.services.sickle.geometry import load_roi
 from app.ml.sickle.runtime import EXPECTED_PARAMETER_COUNT, SickleRuntime
 
 
@@ -15,7 +16,12 @@ def main() -> None:
     roi_path = settings.path(settings.CAUVERY_ROI_PATH)
     checks["approved_roi_resource"] = roi_path.is_file()
     manifest = json.loads((roi_path.parent / "manifest.json").read_text(encoding="utf-8"))
-    checks["approved_roi_manifest"] = manifest.get("status") == "approved" and bool(manifest.get("sha256"))
+    _, roi_checksum = load_roi(roi_path)
+    checks["approved_roi_manifest"] = (
+        manifest.get("status") == "approved"
+        and manifest.get("version") == settings.CAUVERY_ROI_VERSION
+        and manifest.get("sha256") == roi_checksum
+    )
     runtime = SickleRuntime.load(settings.path(settings.SICKLE_CHECKPOINT_PATH), "cpu", 1)
     checks["strict_checkpoint"] = sum(parameter.numel() for parameter in runtime.model.parameters()) == EXPECTED_PARAMETER_COUNT
     fixture_root = Path("tests/fixtures/sickle/pilot_001")

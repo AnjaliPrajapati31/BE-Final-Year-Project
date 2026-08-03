@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+import logging
 from uuid import UUID, uuid4
 
 from app.core.exceptions import DomainError
@@ -9,6 +10,8 @@ from .charts import build_charts
 from .crop import PREPROCESSING_VERSION, summarize_crop, validate_crop_inputs
 from .geometry import validate_geometry
 from .stage import STAGE_RULE_VERSION, estimate_stage, skipped_non_paddy, unavailable
+
+logger = logging.getLogger(__name__)
 
 
 class AnalysisService:
@@ -89,9 +92,22 @@ class AnalysisService:
             charts = build_charts(crop, stage)
             artifacts = []
             if command.generate_artifacts:
-                for artifact in self.artifact_writer.write_analysis(request_id, crop, stage, probabilities, inputs):
-                    self.repository.save_artifact(request_id, artifact)
-                    artifacts.append({**artifact, "download_url": f"/api/v1/analyses/{request_id}/artifacts/{artifact['type']}", "relative_path": None})
+                try:
+                    generated_artifacts, artifact_warnings = self.artifact_writer.write_analysis(request_id, crop, stage, probabilities, inputs)
+                    for artifact in generated_artifacts:
+                        self.repository.save_artifact(request_id, artifact)
+                        artifacts.append({**artifact, "download_url": f"/api/v1/analyses/{request_id}/artifacts/{artifact['type']}", "relative_path": None})
+                    if artifact_warnings:
+                        warnings.extend(artifact_warnings)
+                        status = "partial"
+                except DomainError as exc:
+                    warnings.append(exc.message)
+                    status = "partial"
+                    logger.exception("Artifact generation failed for analysis %s", request_id)
+                except Exception:
+                    warnings.append("Artifacts could not be generated for this analysis.")
+                    status = "partial"
+                    logger.exception("Unexpected artifact generation failure for analysis %s", request_id)
             quality = {"crop_observations": [item.__dict__ for item in inputs.quality], "analysis_cutoff": today.isoformat() if command.year == today.year else f"{command.year}-12-31", "in_season": command.year == today.year and today < date(today.year, 11, 1)}
             self.repository.set_status(request_id, status, warnings=warnings, quality=quality)
             return {

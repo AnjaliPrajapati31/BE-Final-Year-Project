@@ -37,9 +37,6 @@ const MAP_LAYERS = {
   },
 };
 
-// Threshold distance in degrees to detect "click on starting point"
-const SNAP_THRESHOLD = 0.003;
-
 // Component to handle map clicks for placing points
 const MapClickHandler = ({ onMapClick, isDrawing }) => {
   useMapEvents({
@@ -79,30 +76,21 @@ export const MyFields = () => {
     (_, index) => new Date().getFullYear() - index,
   );
 
-  // Check if a new point is close enough to the first point to close the polygon
-  const isNearFirstPoint = useCallback((newPoint) => {
-    if (points.length < 3) return false; // Need at least 3 points before closing
-    const first = points[0];
-    const dist = Math.sqrt(
-      Math.pow(newPoint.lat - first.lat, 2) + Math.pow(newPoint.lng - first.lng, 2)
-    );
-    return dist < SNAP_THRESHOLD;
-  }, [points]);
-
   // Handle adding new point on map click
   const handleMapClick = (newPoint) => {
     if (!isDrawing) return;
 
-    // Check if user clicked near the starting point to close the polygon
-    if (isNearFirstPoint(newPoint)) {
-      setIsDrawing(false);
-      setIsClosed(true);
-      return;
-    }
-
     // Otherwise add the new point
     setPoints((prev) => [...prev, newPoint]);
   };
+
+  const handleClosePolygon = useCallback(() => {
+    if (!isDrawing || points.length < 3) {
+      return;
+    }
+    setIsDrawing(false);
+    setIsClosed(true);
+  }, [isDrawing, points.length]);
 
   // Start new drawing mode
   const handleStartDrawing = () => {
@@ -340,7 +328,7 @@ export const MyFields = () => {
               <span>
                 <strong>Drawing Mode Active:</strong> Click on the map to place vertices ({points.length} point{points.length !== 1 ? 's' : ''} placed).
                 {points.length >= 3 && (
-                  <> Click near the <strong>starting point (P1)</strong> to close the polygon, or press <em>"Finish Drawing"</em>.</>
+                  <> Click the highlighted <strong>starting point (P1)</strong> to close the polygon, or press <em>"Finish Drawing"</em>.</>
                 )}
                 {points.length < 3 && (
                   <> Place at least 3 points to form a polygon.</>
@@ -418,6 +406,7 @@ export const MyFields = () => {
                 key={index}
                 center={[point.lat, point.lng]}
                 radius={index === 0 && isDrawing && points.length >= 3 ? 12 : 9}
+                eventHandlers={index === 0 && isDrawing && points.length >= 3 ? { click: handleClosePolygon } : undefined}
                 pathOptions={{
                   color: index === 0 && isDrawing && points.length >= 3 ? '#fbbf24' : '#ffffff',
                   fillColor: index === 0 && isDrawing && points.length >= 3 ? '#f59e0b' : '#059669',

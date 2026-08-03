@@ -22,6 +22,9 @@ import {
   Info,
   AlertTriangle,
   Database,
+  Clock3,
+  ShieldCheck,
+  FileDown,
 } from 'lucide-react';
 import { EmptyState, LoadingSpinner, SectionHeader } from '../components/UIHelpers';
 import { useApp } from '../contexts/AppContext';
@@ -52,6 +55,11 @@ const formatPercent = (value) => {
   return `${(Number(value) * 100).toFixed(1)}%`;
 };
 
+const asWidthPercent = (value) => {
+  if (value === null || value === undefined) return '0%';
+  return `${Math.max(0, Math.min(100, Number(value) * 100)).toFixed(1)}%`;
+};
+
 const formatArea = (value) => {
   if (value === null || value === undefined) return 'Not available';
   const hectares = Number(value) / 10000;
@@ -66,9 +74,9 @@ const formatArea = (value) => {
 export const Dashboard = () => {
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const { fieldBoundaryPoints, latestAnalysisSummary, setLatestAnalysisSummary } = useApp();
+  const { fieldBoundaryPoints, latestAnalysisSummary, setLatestAnalysisSummary, fieldId: contextFieldId } = useApp();
   const requestId = searchParams.get('requestId');
-  const fieldId = searchParams.get('fieldId');
+  const fieldId = searchParams.get('fieldId') || contextFieldId;
   const [analysis, setAnalysis] = useState(location.state?.analysis || latestAnalysisSummary || null);
   const [loading, setLoading] = useState(Boolean(requestId));
   const [error, setError] = useState(null);
@@ -119,14 +127,40 @@ export const Dashboard = () => {
   const crop = analysis?.crop;
   const stage = analysis?.growth_stage;
   const warnings = analysis?.warnings || [];
+  const artifacts = analysis?.artifacts || [];
+  const quality = analysis?.data_quality || {};
+  const cropObservations = quality.crop_observations || [];
+  const usedMonths = crop?.used_months || {};
+  const rejectedMonths = crop?.rejected_months || {};
 
   if (!requestId && !analysis) {
     return (
-      <EmptyState
-        title="No analysis selected"
-        description="Draw a Cauvery field polygon and submit it from My Fields to load a stored crop analysis."
-        icon={Info}
-      />
+      <div className="space-y-6">
+        <EmptyState
+          title="No analysis selected"
+          description="Draw a Cauvery field polygon and submit it from My Fields to load a stored crop analysis."
+          icon={Info}
+        />
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          <div className="mb-2 text-sm font-bold text-slate-900">No current run loaded</div>
+          <div className="text-sm text-slate-600">
+            {fieldId
+              ? `You can still open the previous stored analyses for field code ${fieldId}.`
+              : 'If you already analyzed a field before, open its history to review stored runs.'}
+          </div>
+          {fieldId && (
+            <div className="mt-4">
+              <Link
+                to={`/history?fieldId=${encodeURIComponent(fieldId)}`}
+                className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-700 transition hover:border-emerald-400"
+              >
+                <Clock3 className="w-4 h-4" />
+                <span>Open Previous History</span>
+              </Link>
+            </div>
+          )}
+        </div>
+      </div>
     );
   }
 
@@ -150,12 +184,42 @@ export const Dashboard = () => {
         title="Crop Analytics Overview"
         subtitle={`Stored FastAPI analysis for ${analysis?.field_id || fieldId || 'selected field'}`}
         action={
-          <div className="flex items-center space-x-2 bg-emerald-50 border border-emerald-200 text-emerald-800 px-3.5 py-1.5 rounded-full text-xs font-bold shadow-2xs">
-            <Database className="w-4 h-4 text-emerald-700" />
-            <span>{analysis?.provider?.live_data ? 'Live Earth Engine Data' : 'Stored Analysis'}</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center space-x-2 bg-emerald-50 border border-emerald-200 text-emerald-800 px-3.5 py-1.5 rounded-full text-xs font-bold shadow-2xs">
+              <Database className="w-4 h-4 text-emerald-700" />
+              <span>{analysis?.provider?.live_data ? 'Live Earth Engine Data' : 'Stored Analysis'}</span>
+            </div>
+            <Link
+              to={`/history?fieldId=${encodeURIComponent(analysis?.field_id || fieldId || '')}`}
+              className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-3.5 py-1.5 text-xs font-bold text-slate-800 transition hover:border-emerald-500 hover:text-emerald-700"
+            >
+              <Clock3 className="w-4 h-4" />
+              <span>View History</span>
+            </Link>
           </div>
         }
       />
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-5">
+        <div className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-900">
+          <Info className="h-4 w-4 text-slate-600" />
+          <span>Analysis Summary</span>
+        </div>
+        <div className="grid grid-cols-1 gap-3 text-sm text-slate-700 md:grid-cols-3">
+          <div className="rounded-xl bg-slate-50 p-4">
+            <div className="text-xs font-bold uppercase tracking-wider text-slate-500">Request ID</div>
+            <div className="mt-1 break-all font-semibold text-slate-900">{analysis?.request_id || requestId}</div>
+          </div>
+          <div className="rounded-xl bg-slate-50 p-4">
+            <div className="text-xs font-bold uppercase tracking-wider text-slate-500">Field Code</div>
+            <div className="mt-1 font-semibold text-slate-900">{analysis?.field_id || fieldId || 'Not available'}</div>
+          </div>
+          <div className="rounded-xl bg-slate-50 p-4">
+            <div className="text-xs font-bold uppercase tracking-wider text-slate-500">Status</div>
+            <div className="mt-1 font-semibold text-slate-900">{analysis?.status || 'Not available'}</div>
+          </div>
+        </div>
+      </div>
 
       {error && (
         <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
@@ -426,7 +490,7 @@ export const Dashboard = () => {
                 <span>{formatPercent(crop?.paddy_probability)}</span>
               </div>
               <div className="h-3 overflow-hidden rounded-full bg-slate-100">
-                <div className="h-full rounded-full bg-emerald-600" style={{ width: formatPercent(crop?.paddy_probability) }} />
+                <div className="h-full rounded-full bg-emerald-600" style={{ width: asWidthPercent(crop?.paddy_probability) }} />
               </div>
             </div>
             <div>
@@ -435,7 +499,7 @@ export const Dashboard = () => {
                 <span>{formatPercent(crop?.non_paddy_probability)}</span>
               </div>
               <div className="h-3 overflow-hidden rounded-full bg-slate-100">
-                <div className="h-full rounded-full bg-slate-700" style={{ width: formatPercent(crop?.non_paddy_probability) }} />
+                <div className="h-full rounded-full bg-slate-700" style={{ width: asWidthPercent(crop?.non_paddy_probability) }} />
               </div>
             </div>
           </div>
@@ -457,6 +521,94 @@ export const Dashboard = () => {
               <div className="text-xs font-bold uppercase tracking-wider text-slate-500">Non-Paddy Pixel Fraction</div>
               <div className="mt-1 text-lg font-extrabold text-slate-900">{formatPercent(crop?.non_paddy_pixel_fraction)}</div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="bg-white rounded-2xl p-6 border border-emerald-200/80 shadow-xs space-y-4">
+          <div className="flex items-center gap-2 text-base font-bold text-slate-900 font-serif">
+            <ShieldCheck className="w-5 h-5 text-emerald-700" />
+            <span>Quality and Month Usage</span>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-xs font-bold uppercase tracking-wider text-slate-500">S1 Months Used</div>
+              <div className="mt-1 text-sm font-semibold text-slate-900">
+                {(usedMonths.S1 || []).length > 0 ? usedMonths.S1.join(', ') : 'None'}
+              </div>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-xs font-bold uppercase tracking-wider text-slate-500">S2 Months Used</div>
+              <div className="mt-1 text-sm font-semibold text-slate-900">
+                {(usedMonths.S2 || []).length > 0 ? usedMonths.S2.join(', ') : 'None'}
+              </div>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-xs font-bold uppercase tracking-wider text-slate-500">Rejected S1 Months</div>
+              <div className="mt-1 text-sm font-semibold text-slate-900">
+                {(rejectedMonths.S1 || []).length > 0 ? rejectedMonths.S1.join(', ') : 'None'}
+              </div>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-xs font-bold uppercase tracking-wider text-slate-500">Rejected S2 Months</div>
+              <div className="mt-1 text-sm font-semibold text-slate-900">
+                {(rejectedMonths.S2 || []).length > 0 ? rejectedMonths.S2.join(', ') : 'None'}
+              </div>
+            </div>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+            <div className="text-xs font-bold uppercase tracking-wider text-slate-500">Observation Records</div>
+            <div className="mt-1 font-semibold text-slate-900">{cropObservations.length} monthly quality records stored</div>
+            <div className="mt-1 text-xs">
+              Analysis cutoff {quality.analysis_cutoff || 'Not available'} · {quality.in_season ? 'In-season experimental result' : 'Completed seasonal window'}
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl p-6 border border-emerald-200/80 shadow-xs space-y-4">
+          <div className="flex items-center gap-2 text-base font-bold text-slate-900 font-serif">
+            <FileDown className="w-5 h-5 text-emerald-700" />
+            <span>Artifacts and Provenance</span>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-xs font-bold uppercase tracking-wider text-slate-500">Model</div>
+              <div className="mt-1 text-sm font-semibold text-slate-900 break-all">{analysis?.provenance?.model || 'Not available'}</div>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-xs font-bold uppercase tracking-wider text-slate-500">Preprocessing</div>
+              <div className="mt-1 text-sm font-semibold text-slate-900">{analysis?.provenance?.preprocessing_version || 'Not available'}</div>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-xs font-bold uppercase tracking-wider text-slate-500">Stage Rules</div>
+              <div className="mt-1 text-sm font-semibold text-slate-900">{analysis?.provenance?.stage_rule_version || 'Not available'}</div>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-xs font-bold uppercase tracking-wider text-slate-500">Checkpoint SHA</div>
+              <div className="mt-1 text-sm font-semibold text-slate-900 break-all">{analysis?.provenance?.checkpoint_sha256 || 'Not available'}</div>
+            </div>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="text-xs font-bold uppercase tracking-wider text-slate-500">Artifacts</div>
+            {artifacts.length > 0 ? (
+              <div className="mt-2 space-y-2">
+                {artifacts.map((artifact) => (
+                  <a
+                    key={artifact.artifact_type || artifact.type}
+                    href={artifact.download_url}
+                    className="flex items-center justify-between rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:border-emerald-400"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <span>{artifact.artifact_type || artifact.type}</span>
+                    <span>Open</span>
+                  </a>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-1 text-sm font-semibold text-slate-900">No artifacts stored for this run.</div>
+            )}
           </div>
         </div>
       </div>
@@ -499,9 +651,12 @@ export const Dashboard = () => {
             </div>
           </div>
 
-          <span className="hidden sm:block px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full border border-emerald-200">
-            <Link to={`/history?fieldId=${encodeURIComponent(analysis?.field_id || fieldId || '')}`}>View History</Link>
-          </span>
+          <Link
+            to={`/history?fieldId=${encodeURIComponent(analysis?.field_id || fieldId || '')}`}
+            className="hidden sm:inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 transition hover:border-emerald-400"
+          >
+            View History
+          </Link>
         </div>
       </div>
     </div>

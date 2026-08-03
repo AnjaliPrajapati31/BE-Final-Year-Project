@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, Calendar, CheckCircle2, Database } from 'lucide-react';
+import { AlertTriangle, Calendar, CheckCircle2, Database, ArrowRight } from 'lucide-react';
 import { EmptyState, LoadingSpinner, SectionHeader } from '../components/UIHelpers';
 import { useApp } from '../contexts/AppContext';
 import { ApiError, getFieldHistory } from '../services/api';
@@ -82,6 +82,13 @@ export const History = () => {
       <SectionHeader
         title="Field Analysis History"
         subtitle={`Stored completed and partial analyses for ${fieldId}`}
+        action={
+          history.length > 0 ? (
+            <div className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700">
+              {history.length} stored run{history.length === 1 ? '' : 's'}
+            </div>
+          ) : null
+        }
       />
 
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
@@ -95,6 +102,7 @@ export const History = () => {
                 <th className="py-3.5 px-4">Crop</th>
                 <th className="py-3.5 px-4">Stage</th>
                 <th className="py-3.5 px-4">Status</th>
+                <th className="py-3.5 px-4">Open</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
@@ -120,6 +128,15 @@ export const History = () => {
                       <CheckCircle2 className="w-3 h-3" />
                       <span>{item.status}</span>
                     </span>
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <Link
+                      to={`/dashboard?requestId=${encodeURIComponent(item.request_id)}&fieldId=${encodeURIComponent(fieldId)}`}
+                      className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 transition hover:border-emerald-400"
+                    >
+                      <span>Full Analysis</span>
+                      <ArrowRight className="w-3 h-3" />
+                    </Link>
                   </td>
                 </tr>
               ))}

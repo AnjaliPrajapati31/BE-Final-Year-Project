@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { Sprout, Menu, X, Leaf, LogIn } from 'lucide-react';
+import { Sprout, Menu, X, Leaf, LogIn, Lock } from 'lucide-react';
 
 export const Navbar = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -11,7 +11,7 @@ export const Navbar = () => {
     { name: 'Home', path: '/' },
     { name: 'My Fields', path: '/fields' },
     { name: 'Analytics', path: '/dashboard' },
-    { name: 'Water Stress', path: '/water-stress' },
+    { name: 'Water Stress', path: '/water-stress', locked: true },
   ];
 
   return (
@@ -39,6 +39,19 @@ export const Navbar = () => {
         <nav className="hidden md:flex items-center space-x-8">
           {navLinks.map((link) => {
             const isActive = location.pathname === link.path || (link.path !== '/' && location.pathname.startsWith(link.path));
+            if (link.locked) {
+              return (
+                <button
+                  key={link.name}
+                  type="button"
+                  title="Coming soon"
+                  className="relative py-1 text-sm font-bold text-slate-400 cursor-not-allowed inline-flex items-center gap-1.5"
+                >
+                  <span>{link.name}</span>
+                  <Lock className="w-3.5 h-3.5" />
+                </button>
+              );
+            }
             return (
               <NavLink
                 key={link.name}
@@ -93,6 +106,19 @@ export const Navbar = () => {
         <div className="md:hidden bg-white border-b border-slate-200 px-4 py-4 space-y-2 shadow-xl">
           {navLinks.map((link) => {
             const isActive = location.pathname === link.path || (link.path !== '/' && location.pathname.startsWith(link.path));
+            if (link.locked) {
+              return (
+                <div
+                  key={link.name}
+                  className="block px-4 py-3 rounded-xl text-base font-semibold text-slate-400 bg-slate-50 cursor-not-allowed"
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <span>{link.name}</span>
+                    <Lock className="w-4 h-4" />
+                  </span>
+                </div>
+              );
+            }
             return (
               <NavLink
                 key={link.name}

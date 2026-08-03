@@ -10,7 +10,7 @@ class Settings(BaseSettings):
 
     APP_NAME: str = "AI Agriculture API"
     APP_ENV: str = "development"
-    CORS_ORIGINS: str = "http://localhost:5173"
+    CORS_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000"
     DATABASE_URL: str | None = None
     DATABASE_POOL_MIN_SIZE: int = 1
     DATABASE_POOL_MAX_SIZE: int = 5

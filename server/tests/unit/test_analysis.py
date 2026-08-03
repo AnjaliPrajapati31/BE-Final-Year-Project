@@ -17,14 +17,18 @@ class Repository:
     def __init__(self):
         self.created = 0
         self.statuses = []
+        self.status_payloads = []
 
     def verify_roi(self, field, patch): return uuid4()
     def create_revision_and_run(self, *args): self.created += 1
-    def set_status(self, request_id, status, **kwargs): self.statuses.append(status)
+    def set_status(self, request_id, status, **kwargs):
+        self.statuses.append(status)
+        self.status_payloads.append((status, kwargs))
     def save_crop(self, *args): pass
     def save_stage(self, *args): pass
     def save_crop_quality(self, *args): pass
     def set_provider_cached(self, *args): pass
+    def save_artifact(self, *args): pass
 
 
 class Provider:
@@ -51,12 +55,21 @@ class Runtime:
 class Artifacts: pass
 
 
+class FailingArtifacts:
+    def write_analysis(self, *args):
+        raise DomainError("ARTIFACT_WRITE_FAILED", "Could not create the crop GeoTIFF artifact.", 500)
+
+
 def settings():
     return SimpleNamespace(FIELD_MAX_VERTICES=10000,FIELD_MIN_AREA_M2=100,FIELD_MAX_AREA_M2=78400,FIELD_MAX_WIDTH_M=280,FIELD_MAX_HEIGHT_M=280,CAUVERY_ROI_VERSION=1)
 
 
 def command_at(lon, lat):
     return FieldAnalysisRequest.model_validate({"field_id":"FIELD_001","geometry":{"type":"Polygon","coordinates":[[[lon,lat],[lon+0.001,lat],[lon+0.001,lat+0.001],[lon,lat+0.001],[lon,lat]]]},"year":2025})
+
+
+def command_at_with_artifacts(lon, lat):
+    return FieldAnalysisRequest.model_validate({"field_id":"FIELD_001","geometry":{"type":"Polygon","coordinates":[[[lon,lat],[lon+0.001,lat],[lon+0.001,lat+0.001],[lon,lat+0.001],[lon,lat]]]},"year":2025,"generate_artifacts":True})
 
 
 def test_non_paddy_completes_without_stage_provider_call():
@@ -75,3 +88,13 @@ def test_outside_roi_never_creates_or_calls_provider():
         service.analyze(command_at(82,15))
     assert error.value.code == "OUTSIDE_SUPPORTED_ROI"
     assert repository.created == 0 and provider.calls == 0
+
+
+def test_artifact_failure_marks_analysis_partial_without_masking_crop_result():
+    repository, provider = Repository(), Provider()
+    service = AnalysisService(settings(), box(78,10,80,12), repository, provider, Runtime(), FailingArtifacts())
+    result = service.analyze(command_at_with_artifacts(79,11))
+    assert result["crop"]["class_label"] == "Non-Paddy"
+    assert result["status"] == "partial"
+    assert "Could not create the crop GeoTIFF artifact." in result["warnings"]
+    assert repository.statuses[-1] == "partial"

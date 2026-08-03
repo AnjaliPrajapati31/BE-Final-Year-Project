@@ -1,16 +1,14 @@
-import { Navigate, Route, Routes } from "react-router-dom";
-import MainLayout from "./layouts/MainLayout.jsx";
-import Home from "./pages/Home.jsx";
+import { BrowserRouter } from 'react-router-dom';
+import { AppProvider } from './contexts/AppContext';
+import { AppRoutes } from './routes/AppRoutes';
+import './index.css';
 
-function App() {
+export default function App() {
   return (
-    <Routes>
-      <Route element={<MainLayout />}>
-        <Route path="/" element={<Home />} />
-      </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <AppProvider>
+      <BrowserRouter>
+        <AppRoutes />
+      </BrowserRouter>
+    </AppProvider>
   );
 }
-
-export default App;

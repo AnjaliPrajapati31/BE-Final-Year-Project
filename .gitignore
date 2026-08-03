@@ -39,6 +39,7 @@ lerna-debug.log*
 dist/
 dist-ssr/
 *.local
+client/backend/
 
 # Dataset files and folders
 archive/

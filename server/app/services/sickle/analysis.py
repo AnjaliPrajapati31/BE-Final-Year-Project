@@ -10,8 +10,16 @@ from .charts import build_charts
 from .crop import PREPROCESSING_VERSION, summarize_crop, validate_crop_inputs
 from .geometry import validate_geometry
 from .stage import STAGE_RULE_VERSION, estimate_stage, skipped_non_paddy, unavailable
+from .stress import STRESS_RULE_VERSION, estimate_stress
 
 logger = logging.getLogger(__name__)
+
+
+def _strip_chart_data(stress: dict | None) -> dict | None:
+    """Return the stress dict without chart_data (charts are placed in the charts key)."""
+    if stress is None:
+        return None
+    return {key: value for key, value in stress.items() if key != "chart_data"}
 
 
 class AnalysisService:
@@ -42,6 +50,7 @@ class AnalysisService:
             "cached": False, "year": command.year, "season": command.season,
             "model_name": self.crop_runtime.model_name, "checkpoint_sha256": self.crop_runtime.checkpoint_sha256,
             "preprocessing_version": PREPROCESSING_VERSION, "stage_rule_version": STAGE_RULE_VERSION,
+            "stress_rule_version": STRESS_RULE_VERSION,
             "field_pixel_count": geometry.field_pixel_count,
         }
         try:
@@ -74,6 +83,7 @@ class AnalysisService:
                 status = "completed"
             else:
                 self.repository.set_status(request_id, "fetching_stage_data")
+                observations = []
                 try:
                     observations = self.provider.detailed_series(geometry, command.year, str(request_id))
                     self.repository.save_observations(request_id, observations, "stage")
@@ -89,11 +99,27 @@ class AnalysisService:
                     status = "partial"
                 else:
                     status = "completed"
-            charts = build_charts(crop, stage)
+            # --- Moisture-stress risk (Paddy only, after stage) ---------------
+            stress: dict | None = None
+            if crop["class_label"] == "Paddy":
+                try:
+                    self.repository.set_status(request_id, "running_stress_rules")
+                    stress = estimate_stress(observations, stage, crop)
+                    self.repository.save_stress(request_id, stress)
+                    if stress["status"] == "insufficient_data":
+                        warnings.append(
+                            stress.get("warning") or "Moisture-stress data are insufficient."
+                        )
+                        if status == "completed":
+                            status = "partial"
+                except Exception:
+                    logger.exception("Stress estimation failed for analysis %s", request_id)
+                    stress = None
+            charts = build_charts(crop, stage, stress)
             artifacts = []
             if command.generate_artifacts:
                 try:
-                    generated_artifacts, artifact_warnings = self.artifact_writer.write_analysis(request_id, crop, stage, probabilities, inputs)
+                    generated_artifacts, artifact_warnings = self.artifact_writer.write_analysis(request_id, crop, stage, probabilities, inputs, stress)
                     for artifact in generated_artifacts:
                         self.repository.save_artifact(request_id, artifact)
                         artifacts.append({**artifact, "download_url": f"/api/v1/analyses/{request_id}/artifacts/{artifact['type']}", "relative_path": None})
@@ -114,10 +140,18 @@ class AnalysisService:
                 "request_id": str(request_id), "field_id": command.field_id, "status": status,
                 "provider": {"name": inputs.provider, "live_data": inputs.live_data, "cached": inputs.cached},
                 "geometry": {"revision_hash": geometry.geometry_hash, "area_m2": geometry.area_m2, "width_m": geometry.width_m, "height_m": geometry.height_m, "field_pixel_count": geometry.field_pixel_count},
-                "data_quality": quality, "crop": crop, "growth_stage": stage, "charts": charts,
-                "explanations": {"confidence": "Mean model probability over field-mask pixels; it is not a measured accuracy."},
+                "data_quality": quality, "crop": crop, "growth_stage": stage,
+                "moisture_stress": _strip_chart_data(stress) if stress else None,
+                "charts": charts,
+                "explanations": {
+                    "confidence": "Mean model probability over field-mask pixels; it is not a measured accuracy.",
+                    "stress_risk": "Evidence-based anomaly score from satellite signals. Provisional only — not a confirmed water-shortage diagnosis.",
+                    "ndmi": "Normalised Difference Moisture Index — vegetation moisture-related signal.",
+                    "ndvi": "Normalised Difference Vegetation Index — crop greenness and canopy condition.",
+                    "radar": "Sentinel-1 SAR backscatter — field structure and surface moisture-related response.",
+                },
                 "artifacts": artifacts, "warnings": warnings,
-                "provenance": {"model": self.crop_runtime.model_name, "checkpoint_sha256": self.crop_runtime.checkpoint_sha256, "preprocessing_version": PREPROCESSING_VERSION, "stage_rule_version": STAGE_RULE_VERSION, "roi_version": self.settings.CAUVERY_ROI_VERSION},
+                "provenance": {"model": self.crop_runtime.model_name, "checkpoint_sha256": self.crop_runtime.checkpoint_sha256, "preprocessing_version": PREPROCESSING_VERSION, "stage_rule_version": STAGE_RULE_VERSION, "stress_rule_version": STRESS_RULE_VERSION, "roi_version": self.settings.CAUVERY_ROI_VERSION},
             }
         except Exception as exc:
             code = exc.code if isinstance(exc, DomainError) else "CROP_INFERENCE_FAILED"

@@ -101,7 +101,7 @@ class ArtifactWriter:
             raise DomainError("ARTIFACT_WRITE_FAILED", "Could not create the stage timeline artifact.", 500) from exc
         return self._write(request_id, "stage_curve", "png", "image/png", buffer.getvalue())
 
-    def write_analysis(self, request_id: UUID, crop: dict, stage: dict, probabilities: np.ndarray, inputs) -> tuple[list[dict], list[str]]:
+    def write_analysis(self, request_id: UUID, crop: dict, stage: dict, probabilities: np.ndarray, inputs, stress: dict | None = None) -> tuple[list[dict], list[str]]:
         artifacts: list[dict] = []
         warnings: list[str] = []
         operations = [
@@ -112,6 +112,14 @@ class ArtifactWriter:
             lambda: self.write_json(request_id, "stage_summary_json", {key: value for key, value in stage.items() if key != "timeline"}),
             lambda: self.write_csv(request_id, "stage_timeline_csv", stage.get("timeline", [])),
         ]
+        if stress is not None:
+            stress_meta = {key: value for key, value in stress.items() if key != "chart_data"}
+            chart = stress.get("chart_data") or {}
+            operations += [
+                lambda sm=stress_meta: self.write_json(request_id, "stress_summary_json", sm),
+                lambda ch=chart: self.write_csv(request_id, "stress_optical_csv", ch.get("optical", [])),
+                lambda ch=chart: self.write_csv(request_id, "stress_radar_csv", ch.get("radar", [])),
+            ]
         for operation in operations:
             try:
                 artifacts.append(operation())

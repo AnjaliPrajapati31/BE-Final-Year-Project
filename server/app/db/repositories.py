@@ -54,9 +54,9 @@ class AnalysisRepository:
                 )
                 revision_id = cursor.fetchone()[0]
             cursor.execute(
-                """INSERT INTO analysis_runs(request_id,field_revision_id,status,provider,provider_live_data,provider_cached,year,season,model_name,checkpoint_sha256,preprocessing_version,stage_rule_version)
-                VALUES (%s,%s,'pending',%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-                (run["request_id"], revision_id, run["provider"], run["live_data"], run["cached"], run["year"], run["season"], run["model_name"], run["checkpoint_sha256"], run["preprocessing_version"], run["stage_rule_version"]),
+                """INSERT INTO analysis_runs(request_id,field_revision_id,status,provider,provider_live_data,provider_cached,year,season,model_name,checkpoint_sha256,preprocessing_version,stage_rule_version,stress_rule_version)
+                VALUES (%s,%s,'pending',%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                (run["request_id"], revision_id, run["provider"], run["live_data"], run["cached"], run["year"], run["season"], run["model_name"], run["checkpoint_sha256"], run["preprocessing_version"], run["stage_rule_version"], run.get("stress_rule_version", "provisional-cauvery-v1")),
             )
         return field_id, revision_id
 
@@ -119,15 +119,115 @@ class AnalysisRepository:
                 (request_id,result.get("status"),result.get("reason_code"),result.get("provisional",True),result.get("stage"),result.get("evidence"),result.get("cycle_start"),result.get("latest_observation"),result.get("current_cycle_count"),result.get("current_cycle_span_days"),result.get("latest_ndvi"),result.get("latest_ndmi"),result.get("peak_confirmed",False),result.get("maximum_interpretation"),result.get("selected_s1_orbit_pass"),result.get("selected_s1_orbit_number"),result.get("clean_s1_observation_count",0),result.get("clean_s2_observation_count",0),result.get("warning")),
             )
 
+    def save_stress(self, request_id: UUID, result: dict) -> None:
+        with self.pool.connection() as connection, connection.transaction(), connection.cursor() as cursor:
+            cursor.execute(
+                """INSERT INTO stress_results(
+                    request_id,status,reason_code,provisional,
+                    stress_risk,stress_score,latest_observation_date,persistence_observations,
+                    stage_context,stage_evidence,evidence,counter_evidence,warning,stress_rule_version
+                ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s::jsonb,%s,%s)""",
+                (
+                    request_id,
+                    result.get("status"),
+                    result.get("reason_code"),
+                    result.get("provisional", True),
+                    result.get("stress_risk"),
+                    result.get("stress_score"),
+                    result.get("latest_observation_date"),
+                    result.get("persistence_observations"),
+                    result.get("stage_context"),
+                    result.get("stage_evidence"),
+                    json.dumps(result.get("evidence", [])),
+                    json.dumps(result.get("counter_evidence", [])),
+                    result.get("warning"),
+                    result.get("stress_rule_version", "provisional-cauvery-v1"),
+                ),
+            )
+
     def get_analysis(self, request_id: UUID) -> dict | None:
         with self.pool.connection() as connection, connection.cursor(row_factory=dict_row) as cursor:
-            cursor.execute("""SELECT ar.*,f.field_code,fr.revision_number,fr.geometry_hash,fr.area_m2,fr.width_m,fr.height_m,ST_AsGeoJSON(fr.geometry)::jsonb AS geometry,roi.version AS roi_version,cr.class_code,cr.class_label,cr.confidence,cr.paddy_probability,cr.non_paddy_probability,cr.paddy_pixel_fraction,cr.non_paddy_pixel_fraction,cr.field_pixel_count,cr.s1_observation_count,cr.s2_observation_count,cr.used_months,cr.rejected_months,cr.experimental,sr.status AS stage_status,sr.reason_code,sr.provisional,sr.stage,sr.evidence,sr.cycle_start,sr.latest_observation,sr.current_cycle_count,sr.current_cycle_span_days,sr.latest_ndvi,sr.latest_ndmi,sr.peak_confirmed,sr.maximum_interpretation,sr.selected_s1_orbit_pass,sr.selected_s1_orbit_number,sr.clean_s1_observation_count,sr.clean_s2_observation_count,sr.warning AS stage_warning FROM analysis_runs ar JOIN field_revisions fr ON fr.id=ar.field_revision_id JOIN fields f ON f.id=fr.field_id JOIN supported_regions roi ON roi.id=fr.roi_id LEFT JOIN crop_results cr ON cr.request_id=ar.request_id LEFT JOIN stage_results sr ON sr.request_id=ar.request_id WHERE ar.request_id=%s""", (request_id,))
+            cursor.execute(
+                """
+                SELECT
+                    ar.*,
+                    f.field_code,
+                    fr.revision_number, fr.geometry_hash, fr.area_m2, fr.width_m, fr.height_m,
+                    ST_AsGeoJSON(fr.geometry)::jsonb AS geometry,
+                    roi.version AS roi_version,
+                    cr.class_code, cr.class_label, cr.confidence,
+                    cr.paddy_probability, cr.non_paddy_probability,
+                    cr.paddy_pixel_fraction, cr.non_paddy_pixel_fraction,
+                    cr.field_pixel_count, cr.s1_observation_count, cr.s2_observation_count,
+                    cr.used_months, cr.rejected_months, cr.experimental,
+                    sr.status         AS stage_status,
+                    sr.reason_code,
+                    sr.provisional,
+                    sr.stage,
+                    sr.evidence,
+                    sr.cycle_start,
+                    sr.latest_observation,
+                    sr.current_cycle_count,
+                    sr.current_cycle_span_days,
+                    sr.latest_ndvi,
+                    sr.latest_ndmi,
+                    sr.peak_confirmed,
+                    sr.maximum_interpretation,
+                    sr.selected_s1_orbit_pass,
+                    sr.selected_s1_orbit_number,
+                    sr.clean_s1_observation_count,
+                    sr.clean_s2_observation_count,
+                    sr.warning        AS stage_warning,
+                    stx.status        AS stress_status,
+                    stx.reason_code   AS stress_reason_code,
+                    stx.stress_risk,
+                    stx.stress_score,
+                    stx.latest_observation_date AS stress_latest_obs,
+                    stx.persistence_observations,
+                    stx.stage_context,
+                    stx.stage_evidence AS stress_stage_evidence,
+                    stx.evidence      AS stress_evidence,
+                    stx.counter_evidence AS stress_counter_evidence,
+                    stx.warning       AS stress_warning,
+                    stx.stress_rule_version
+                FROM analysis_runs ar
+                JOIN field_revisions fr ON fr.id = ar.field_revision_id
+                JOIN fields f          ON f.id  = fr.field_id
+                JOIN supported_regions roi ON roi.id = fr.roi_id
+                LEFT JOIN crop_results  cr  ON cr.request_id  = ar.request_id
+                LEFT JOIN stage_results sr  ON sr.request_id  = ar.request_id
+                LEFT JOIN stress_results stx ON stx.request_id = ar.request_id
+                WHERE ar.request_id = %s
+                """,
+                (request_id,),
+            )
             return cursor.fetchone()
 
     def get_stage_chart(self, request_id: UUID) -> list[dict]:
         with self.pool.connection() as connection, connection.cursor(row_factory=dict_row) as cursor:
             cursor.execute("SELECT observation_date AS date,ndvi,ndmi,ndwi FROM satellite_observations WHERE request_id=%s AND sensor='S2' AND purpose IN ('stage','both') AND accepted=TRUE ORDER BY observation_date", (request_id,))
             return list(cursor.fetchall())
+
+    def get_stress_chart(self, request_id: UUID) -> dict:
+        """Return optical and radar time-series arrays for the stress chart on stored-retrieval."""
+        with self.pool.connection() as connection, connection.cursor(row_factory=dict_row) as cursor:
+            cursor.execute(
+                """SELECT observation_date AS date,ndvi,ndmi,ndwi
+                   FROM satellite_observations
+                   WHERE request_id=%s AND sensor='S2' AND purpose IN ('stage','both') AND accepted=TRUE
+                   ORDER BY observation_date""",
+                (request_id,),
+            )
+            optical = [{**row, "stress_marker": False} for row in cursor.fetchall()]
+            cursor.execute(
+                """SELECT observation_date AS date,vv,vh,vv_minus_vh
+                   FROM satellite_observations
+                   WHERE request_id=%s AND sensor='S1' AND purpose IN ('stage','both') AND accepted=TRUE
+                   ORDER BY observation_date""",
+                (request_id,),
+            )
+            radar = list(cursor.fetchall())
+        return {"optical": optical, "radar": radar}
 
     def list_artifacts(self, request_id: UUID) -> list[dict]:
         with self.pool.connection() as connection, connection.cursor(row_factory=dict_row) as cursor:

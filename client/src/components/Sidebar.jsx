@@ -3,6 +3,7 @@ import {
   Home,
   LayoutDashboard,
   Map,
+  Droplets,
   CloudSun,
   Sparkles,
   History,
@@ -15,16 +16,17 @@ import {
 } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 const navItems = [
-  { name: 'Dashboard', path: '/', icon: LayoutDashboard },
   { name: 'Home', path: '/', icon: Home },
   { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
   { name: 'My Fields', path: '/fields', icon: Map },
+  { name: 'Water Stress', path: '/water-stress', icon: Droplets },
   { name: 'Weather', path: '/weather', icon: CloudSun },
   { name: 'Recommendations', path: '/recommendations', icon: Sparkles },
   { name: 'History', path: '/history', icon: History },
   { name: 'Notifications', path: '/notifications', icon: Bell },
   { name: 'Settings', path: '/settings', icon: Settings },
 ];
+
 export const Sidebar = () => {
   const { sidebarOpen, toggleSidebar } = useApp();
   return (

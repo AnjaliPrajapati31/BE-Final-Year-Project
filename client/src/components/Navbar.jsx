@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { Sprout, Menu, X, Leaf, LogIn, Lock } from 'lucide-react';
+import { Sprout, Menu, X, Leaf, LogIn, Droplets } from 'lucide-react';
 
 export const Navbar = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -11,8 +11,9 @@ export const Navbar = () => {
     { name: 'Home', path: '/' },
     { name: 'My Fields', path: '/fields' },
     { name: 'Analytics', path: '/dashboard' },
-    { name: 'Water Stress', path: '/water-stress', locked: true },
+    { name: 'Water Stress', path: '/water-stress' },
   ];
+
 
   return (
     <header className="sticky top-0 z-50 bg-[#F9FAF7]/95 backdrop-blur-md border-b border-emerald-900/10 text-slate-900 transition-all shadow-xs">

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import date
+from dataclasses import replace
+from datetime import date, timedelta
 import logging
 from uuid import UUID, uuid4
 
@@ -11,6 +12,10 @@ from .crop import PREPROCESSING_VERSION, summarize_crop, validate_crop_inputs
 from .geometry import validate_geometry
 from .stage import STAGE_RULE_VERSION, estimate_stage, skipped_non_paddy, unavailable
 from .stress import STRESS_RULE_VERSION, estimate_stress
+from app.services.water.advisory import build_irrigation_advisory
+from app.services.water.balance import calculate_paddy_balance
+from app.services.water.contracts import DailyWeather, WaterState
+from app.services.water.profiles import CAUVERY_PADDY_V1
 
 logger = logging.getLogger(__name__)
 
@@ -22,14 +27,30 @@ def _strip_chart_data(stress: dict | None) -> dict | None:
     return {key: value for key, value in stress.items() if key != "chart_data"}
 
 
+def _module_contract(result: dict, *, evidence_level: str | None = None, rule_version: str | None = None) -> dict:
+    warnings = result.get("warnings") or ([result["warning"]] if result.get("warning") else [])
+    return {
+        "status": result["status"], "provisional": result.get("provisional", False),
+        "evidence_level": evidence_level or result.get("evidence_level"),
+        "reason_code": result.get("reason_code"), "warnings": warnings,
+        "input_sources": result.get("input_sources", []),
+        "rule_version": rule_version or result.get("rule_version"),
+    }
+
+
 class AnalysisService:
-    def __init__(self, settings, roi, repository, provider, crop_runtime, artifact_writer):
+    def __init__(self, settings, roi, repository, provider, crop_runtime, artifact_writer, weather_provider=None):
         self.settings = settings
         self.roi = roi
         self.repository = repository
         self.provider = provider
         self.crop_runtime = crop_runtime
         self.artifact_writer = artifact_writer
+        self.weather_provider = weather_provider
+
+    def _save_module(self, request_id, module: str, result: dict) -> None:
+        if hasattr(self.repository, "save_module_run"):
+            self.repository.save_module_run(request_id, module, result)
 
     def analyze(self, command) -> dict:
         request_id = uuid4()
@@ -73,6 +94,14 @@ class AnalysisService:
                 for sensor in ("S1", "S2")
             }
             self.repository.save_crop(request_id, crop)
+            if hasattr(self.repository, "save_result_payload"):
+                self.repository.save_result_payload(request_id, "crop", crop)
+            modules = {
+                "crop": _module_contract({"status": "completed", "provisional": False, "evidence_level": "medium",
+                         "reason_code": None, "warnings": [], "input_sources": [inputs.provider],
+                         "rule_version": PREPROCESSING_VERSION})
+            }
+            self._save_module(request_id, "crop", modules["crop"])
             warnings = [f"Missing usable {sensor} months: {', '.join(months)}" for sensor, months in crop["rejected_months"].items() if months]
             today = date.today()
             if command.year == today.year and today < date(today.year, 11, 1):
@@ -80,6 +109,7 @@ class AnalysisService:
             if crop["class_label"] != "Paddy":
                 stage = skipped_non_paddy()
                 self.repository.save_stage(request_id, stage)
+                modules["growth_stage"] = _module_contract(stage, evidence_level="low", rule_version=STAGE_RULE_VERSION)
                 status = "completed"
             else:
                 self.repository.set_status(request_id, "fetching_stage_data")
@@ -94,11 +124,18 @@ class AnalysisService:
                 except Exception:
                     stage = unavailable("DETAILED_TIMESERIES_UNAVAILABLE", "Detailed Earth Engine time-series retrieval failed.")
                 self.repository.save_stage(request_id, stage)
+                modules["growth_stage"] = _module_contract(
+                    stage, evidence_level="low" if str(stage.get("evidence", "")).startswith("Low") else "medium",
+                    rule_version=STAGE_RULE_VERSION,
+                )
                 if stage["status"] != "completed" or stage.get("reason_code") == "LOW_STAGE_EVIDENCE":
                     warnings.append(stage.get("warning") or "Growth stage is not available.")
                     status = "partial"
                 else:
                     status = "completed"
+            if hasattr(self.repository, "save_result_payload"):
+                self.repository.save_result_payload(request_id, "growth_stage", stage)
+            self._save_module(request_id, "growth_stage", modules["growth_stage"])
             # --- Moisture-stress risk (Paddy only, after stage) ---------------
             stress: dict | None = None
             if crop["class_label"] == "Paddy":
@@ -114,12 +151,208 @@ class AnalysisService:
                             status = "partial"
                 except Exception:
                     logger.exception("Stress estimation failed for analysis %s", request_id)
-                    stress = None
+                    stress = {
+                        "status": "failed", "reason_code": "STRESS_ESTIMATION_FAILED",
+                        "provisional": True, "stress_risk": None, "stress_score": None,
+                        "latest_observation_date": None, "persistence_observations": None,
+                        "stage_context": stage.get("stage"), "stage_evidence": stage.get("evidence"),
+                        "evidence": [], "counter_evidence": [],
+                        "warning": "Moisture-stress estimation failed; independent modules may still complete.",
+                        "chart_data": {"optical": [], "radar": []},
+                        "stress_rule_version": STRESS_RULE_VERSION,
+                    }
+                    try:
+                        self.repository.save_stress(request_id, stress)
+                    except Exception:
+                        logger.exception("Could not persist failed stress status for analysis %s", request_id)
+                    warnings.append(stress["warning"])
+                    status = "partial"
+            else:
+                stress = estimate_stress([], stage, crop)
+                if hasattr(self.repository, "save_stress"):
+                    self.repository.save_stress(request_id, stress)
+            modules["moisture_stress"] = _module_contract(
+                stress or {"status": "failed", "reason_code": "STRESS_RESULT_MISSING", "provisional": True},
+                evidence_level="low" if not stress or stress.get("status") != "completed" else "medium",
+                rule_version=STRESS_RULE_VERSION,
+            )
+            if hasattr(self.repository, "save_result_payload"):
+                self.repository.save_result_payload(request_id, "moisture_stress", _strip_chart_data(stress) if stress else {})
+            self._save_module(request_id, "moisture_stress", modules["moisture_stress"])
+
+            weather_result = None
+            water_balance = None
+            irrigation_advisory = None
+            water_chart = []
+            if crop["class_label"] != "Paddy":
+                for module, reason in (
+                    ("weather", "NON_PADDY_WEATHER_SKIPPED"),
+                    ("water_balance", "NON_PADDY_WATER_BALANCE_SKIPPED"),
+                    ("irrigation_advisory", "NON_PADDY_ADVISORY_SKIPPED"),
+                ):
+                    modules[module] = {"status": "skipped", "reason_code": reason, "provisional": True,
+                                       "evidence_level": "low", "warnings": [], "input_sources": []}
+                    self._save_module(request_id, module, modules[module])
+            elif stage.get("status") != "completed" or not stage.get("cycle_start"):
+                modules["weather"] = {"status": "skipped", "reason_code": "CYCLE_START_UNAVAILABLE", "provisional": True,
+                                      "evidence_level": "low", "warnings": [], "input_sources": []}
+                modules["water_balance"] = {"status": "insufficient_data", "reason_code": "CYCLE_START_UNAVAILABLE", "provisional": True,
+                                            "evidence_level": "low", "warnings": ["A usable crop-cycle start is required."], "input_sources": []}
+                modules["irrigation_advisory"] = {"status": "skipped", "reason_code": "WATER_BALANCE_UNAVAILABLE", "provisional": True,
+                                                  "evidence_level": "low", "warnings": [], "input_sources": []}
+                for module in ("weather", "water_balance", "irrigation_advisory"):
+                    self._save_module(request_id, module, modules[module])
+                status = "partial"
+            elif self.weather_provider is None:
+                modules["weather"] = {"status": "failed", "reason_code": "WEATHER_PROVIDER_NOT_CONFIGURED", "provisional": True,
+                                      "evidence_level": "low", "warnings": ["Weather provider is unavailable."], "input_sources": []}
+                modules["water_balance"] = {"status": "insufficient_data", "reason_code": "HISTORICAL_WEATHER_UNAVAILABLE", "provisional": True,
+                                            "evidence_level": "low", "warnings": ["Historical weather is required."], "input_sources": []}
+                modules["irrigation_advisory"] = {"status": "skipped", "reason_code": "WATER_BALANCE_UNAVAILABLE", "provisional": True,
+                                                  "evidence_level": "low", "warnings": [], "input_sources": []}
+                for module in ("weather", "water_balance", "irrigation_advisory"):
+                    self._save_module(request_id, module, modules[module])
+                warnings.append("Weather provider is unavailable; water balance was not calculated.")
+                status = "partial"
+            else:
+                try:
+                    self.repository.set_status(request_id, "fetching_weather")
+                    cycle_start_value = command.transplanting_date_hint or command.sowing_date_hint or stage["cycle_start"]
+                    cycle_start = cycle_start_value if isinstance(cycle_start_value, date) else date.fromisoformat(str(cycle_start_value))
+                    cycle_source = "transplanting_date" if command.transplanting_date_hint else (
+                        "sowing_date" if command.sowing_date_hint else "satellite_stage"
+                    )
+                    end_date = min(date(command.year, 12, 31), date.today())
+                    historical = self.weather_provider.historical(geometry, cycle_start, end_date, str(request_id))
+                    historical_lag_days = (end_date - historical[-1].date).days
+                    forecast = []
+                    advisory_forecast = []
+                    forecast_warning = None
+                    if command.year == date.today().year:
+                        try:
+                            forecast = self.weather_provider.forecast(geometry, date.today() + timedelta(days=1), 5, str(request_id))
+                            advisory_forecast = forecast
+                            if len(forecast) < 5:
+                                advisory_forecast = []
+                                forecast_warning = "Forecast horizon is incomplete; advisory uses current deficit only."
+                            elif any("forecast_stale=true" in str(item.quality) for item in forecast):
+                                advisory_forecast = []
+                                forecast_warning = "Forecast model run is stale; advisory uses current deficit only."
+                        except Exception:
+                            forecast_warning = "Forecast is unavailable or stale; advisory uses current deficit only."
+                    if hasattr(self.repository, "save_weather"):
+                        self.repository.save_weather(request_id, historical + forecast)
+                    weather_result = {
+                        "status": "completed", "provisional": False, "evidence_level": "low", "reason_code": None,
+                        "historical_days": len(historical), "forecast_days": len(forecast),
+                        "historical": [item.__dict__ for item in historical], "forecast": [item.__dict__ for item in forecast],
+                        "historical_as_of_date": historical[-1].date.isoformat(),
+                        "historical_lag_days": historical_lag_days,
+                        "warnings": ["Rainfall and meteorology are coarse spatial estimates, not field gauge measurements."]
+                        + ([f"Historical weather is {historical_lag_days} day(s) behind the requested analysis date."] if historical_lag_days else [])
+                        + ([forecast_warning] if forecast_warning else []),
+                        "input_sources": sorted({item.source for item in historical + forecast}), "rule_version": "fao56-pm-v1",
+                    }
+                    if hasattr(self.repository, "save_result_payload"):
+                        self.repository.save_result_payload(request_id, "weather", weather_result)
+                    modules["weather"] = _module_contract(weather_result)
+                    self._save_module(request_id, "weather", modules["weather"])
+
+                    profile = CAUVERY_PADDY_V1
+                    stored_profile = self.repository.get_water_profile(command.field_id) if hasattr(self.repository, "get_water_profile") else None
+                    initial_state = None
+                    initial_state_source = "stage_default"
+                    if stored_profile and stored_profile.get("overrides"):
+                        overrides = dict(stored_profile["overrides"])
+                        initial_ponded = overrides.pop("initial_ponded_water_mm", None)
+                        initial_depletion = overrides.pop("initial_root_depletion_mm", None)
+                        profile = replace(profile, **overrides)
+                        if initial_ponded is not None or initial_depletion is not None:
+                            _, _, target = profile.stage_parameters(0)
+                            initial_state = WaterState(float(initial_depletion or 0), float(target if initial_ponded is None else initial_ponded))
+                            initial_state_source = "measured" if stored_profile.get("source") == "measured" else "user_profile"
+                    irrigation = self.repository.irrigation_depths(command.field_id, cycle_start, end_date) if hasattr(self.repository, "irrigation_depths") else []
+                    self.repository.set_status(request_id, "running_water_balance")
+                    water_balance = calculate_paddy_balance(
+                        historical, irrigation, profile, cycle_start,
+                        initial_state=initial_state, initial_state_source=initial_state_source,
+                        cycle_start_source=cycle_source, irrigation_history_complete=False,
+                    )
+                    water_chart = water_balance["daily"]
+                    if hasattr(self.repository, "save_water_balance"):
+                        self.repository.save_water_balance(request_id, water_balance)
+                    if hasattr(self.repository, "save_result_payload"):
+                        self.repository.save_result_payload(request_id, "water_balance", {key: value for key, value in water_balance.items() if key != "daily"})
+                    modules["water_balance"] = _module_contract(water_balance)
+                    self._save_module(request_id, "water_balance", modules["water_balance"])
+
+                    projected_rows = []
+                    if advisory_forecast and historical_lag_days == 0:
+                        rain_credit = (0.8, 0.8, 0.6, 0.5, 0.4)
+                        conservative_forecast = [
+                            DailyWeather(item.date, item.rainfall_mm * rain_credit[min(index, 4)], item.et0_mm,
+                                         item.kind, item.source, item.quality)
+                            for index, item in enumerate(advisory_forecast)
+                        ]
+                        projection = calculate_paddy_balance(
+                            conservative_forecast, [], profile, cycle_start,
+                            initial_state=WaterState(**water_balance["final_state"]),
+                            initial_state_source="calculated", cycle_start_source=cycle_source,
+                            irrigation_history_complete=False,
+                        )
+                        projected_rows = projection["daily"]
+                        for row in projected_rows:
+                            row["rainfall_is_credited"] = True
+                    self.repository.set_status(request_id, "running_irrigation_advisory")
+                    if historical_lag_days:
+                        irrigation_advisory = {
+                            "status": "insufficient_data", "action": "unavailable",
+                            "reason_code": "HISTORICAL_WEATHER_STALE", "provisional": True,
+                            "evidence_level": "low", "rule_version": "paddy-advisory-v1",
+                            "urgency": None, "reason": "The latest water-balance state is not current enough for irrigation advice.",
+                            "net_depth_mm": None, "gross_depth_mm": None, "volume_m3": None,
+                            "irrigation_efficiency": profile.irrigation_efficiency,
+                            "forecast_rainfall_credited_mm": None, "trigger_crossing_date": None,
+                            "warnings": [f"Historical weather is {historical_lag_days} day(s) behind; no current advisory was issued."],
+                        }
+                    else:
+                        irrigation_advisory = build_irrigation_advisory(
+                            water_balance, projected_rows, field_area_m2=geometry.area_m2,
+                            irrigation_efficiency=profile.irrigation_efficiency,
+                        )
+                    if forecast_warning and irrigation_advisory.get("warnings") is not None:
+                        irrigation_advisory["warnings"].append(forecast_warning)
+                    if hasattr(self.repository, "save_advisory"):
+                        self.repository.save_advisory(request_id, irrigation_advisory)
+                    if hasattr(self.repository, "save_result_payload"):
+                        self.repository.save_result_payload(request_id, "irrigation_advisory", irrigation_advisory)
+                    modules["irrigation_advisory"] = _module_contract(irrigation_advisory)
+                    self._save_module(request_id, "irrigation_advisory", modules["irrigation_advisory"])
+                    warnings.extend(weather_result["warnings"] + water_balance["warnings"])
+                    if irrigation_advisory["status"] != "completed":
+                        status = "partial"
+                except Exception as exc:
+                    logger.exception("Weather or water-balance processing failed for analysis %s", request_id)
+                    reason = exc.code if isinstance(exc, DomainError) else "WATER_BALANCE_FAILED"
+                    message = exc.message if isinstance(exc, DomainError) else "Water-balance processing failed."
+                    if "weather" not in modules:
+                        modules["weather"] = {"status": "failed", "reason_code": reason, "provisional": True, "evidence_level": "low", "warnings": [message], "input_sources": []}
+                    if "water_balance" not in modules:
+                        modules["water_balance"] = {"status": "insufficient_data" if isinstance(exc, DomainError) else "failed", "reason_code": reason, "provisional": True, "evidence_level": "low", "warnings": [message], "input_sources": []}
+                    modules["irrigation_advisory"] = {"status": "skipped", "reason_code": "WATER_BALANCE_UNAVAILABLE", "provisional": True, "evidence_level": "low", "warnings": [], "input_sources": []}
+                    for module in ("weather", "water_balance", "irrigation_advisory"):
+                        self._save_module(request_id, module, modules[module])
+                    warnings.append(message)
+                    status = "partial"
+            modules = {name: _module_contract(result) for name, result in modules.items()}
             charts = build_charts(crop, stage, stress)
+            charts["water_balance"] = water_chart
+            if hasattr(self.repository, "save_result_payload"):
+                self.repository.save_result_payload(request_id, "charts", charts)
             artifacts = []
             if command.generate_artifacts:
                 try:
-                    generated_artifacts, artifact_warnings = self.artifact_writer.write_analysis(request_id, crop, stage, probabilities, inputs, stress)
+                    generated_artifacts, artifact_warnings = self.artifact_writer.write_analysis(request_id, crop, stage, probabilities, inputs, stress, water_balance, irrigation_advisory)
                     for artifact in generated_artifacts:
                         self.repository.save_artifact(request_id, artifact)
                         artifacts.append({**artifact, "download_url": f"/api/v1/analyses/{request_id}/artifacts/{artifact['type']}", "relative_path": None})
@@ -142,6 +375,8 @@ class AnalysisService:
                 "geometry": {"revision_hash": geometry.geometry_hash, "area_m2": geometry.area_m2, "width_m": geometry.width_m, "height_m": geometry.height_m, "field_pixel_count": geometry.field_pixel_count},
                 "data_quality": quality, "crop": crop, "growth_stage": stage,
                 "moisture_stress": _strip_chart_data(stress) if stress else None,
+                "modules": modules, "weather": weather_result, "water_balance": None if water_balance is None else {key: value for key, value in water_balance.items() if key != "daily"},
+                "irrigation_advisory": irrigation_advisory,
                 "charts": charts,
                 "explanations": {
                     "confidence": "Mean model probability over field-mask pixels; it is not a measured accuracy.",

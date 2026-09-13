@@ -12,6 +12,7 @@ from app.services.sickle.analysis import AnalysisService
 from app.services.sickle.artifacts import ArtifactWriter
 from app.services.sickle.geometry import load_roi
 from app.services.sickle.providers.earth_engine import EarthEngineProvider
+from app.services.weather.earth_engine import EarthEngineWeatherProvider
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,7 @@ async def lifespan(app):
     app.state.crop_runtime = None
     app.state.provider = None
     app.state.analysis_service = None
+    app.state.dependencies["database_schema"] = {"ready": False, "error": "Database schema has not been checked."}
     roi_checksum = None
     try:
         app.state.roi, roi_checksum = load_roi(settings.path(settings.CAUVERY_ROI_PATH))
@@ -42,6 +44,10 @@ async def lifespan(app):
             database.open()
             details = database.check()
             repository = AnalysisRepository(database.pool, settings.CAUVERY_ROI_CODE)
+            schema_details = repository.schema_readiness()
+            app.state.dependencies["database_schema"] = schema_details
+            if not schema_details["ready"]:
+                raise RuntimeError("Required database migrations or tables are missing")
             active_roi = repository.active_roi()
             if not active_roi:
                 raise RuntimeError("No active Cauvery ROI exists in PostGIS")
@@ -67,6 +73,10 @@ async def lifespan(app):
     provider.initialize()
     app.state.provider = provider
     app.state.dependencies["earth_engine"] = provider.readiness()
+    weather_provider = EarthEngineWeatherProvider(provider)
+    app.state.weather_provider = weather_provider
+    app.state.dependencies["historical_weather"] = weather_provider.readiness()
+    app.state.dependencies["forecast_weather"] = weather_provider.readiness()
     artifact_writer = ArtifactWriter(settings.path(settings.SICKLE_ARTIFACT_ROOT), settings.SICKLE_ARTIFACTS_ENABLED)
     try:
         if settings.SICKLE_ARTIFACTS_ENABLED:
@@ -76,7 +86,7 @@ async def lifespan(app):
         app.state.dependencies["artifacts"] = {"ready": False, "enabled": True, "error": "Artifact root is not writable."}
     required = (app.state.roi, app.state.repository, app.state.crop_runtime)
     if all(item is not None for item in required) and provider.readiness()["ready"] and app.state.dependencies["artifacts"]["ready"]:
-        app.state.analysis_service = AnalysisService(settings, app.state.roi, app.state.repository, provider, app.state.crop_runtime, artifact_writer)
+        app.state.analysis_service = AnalysisService(settings, app.state.roi, app.state.repository, provider, app.state.crop_runtime, artifact_writer, weather_provider)
     try:
         yield
     finally:

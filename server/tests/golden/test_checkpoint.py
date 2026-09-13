@@ -6,6 +6,7 @@ from app.ml.sickle.runtime import EXPECTED_PARAMETER_COUNT, SickleRuntime
 from app.services.sickle.crop import summarize_crop, validate_crop_inputs
 from app.services.sickle.providers.local_fixture import LocalFixtureProvider
 from app.services.sickle.stage import estimate_stage
+from app.services.sickle.stress import STRESS_RULE_VERSION, estimate_stress
 
 pytestmark = pytest.mark.golden
 
@@ -43,3 +44,17 @@ def test_raw_pilot_timeseries_matches_corrected_stage():
     assert result["selected_s1_orbit_number"] == 92
     assert result["clean_s1_observation_count"] == 12
     assert result["clean_s2_observation_count"] == 15
+
+
+def test_raw_pilot_timeseries_matches_provisional_stress_baseline():
+    provider = LocalFixtureProvider(Path("tests/fixtures/sickle/pilot_001"))
+    observations = provider.detailed_series()
+    stage = estimate_stage(observations)
+    result = estimate_stress(observations, stage, {"class_label": "Paddy"})
+    assert result["status"] == "completed"
+    assert result["stress_risk"] == "No stress evidence"
+    assert result["stress_score"] == pytest.approx(0.05)
+    assert result["latest_observation_date"] == "2025-10-31"
+    assert result["stress_rule_version"] == STRESS_RULE_VERSION
+    assert result["provisional"] is True
+    assert "does not confirm" in result["warning"]

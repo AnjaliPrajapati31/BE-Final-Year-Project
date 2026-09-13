@@ -20,7 +20,7 @@ def skipped_non_paddy() -> dict[str, Any]:
 
 
 def unavailable(reason_code: str, warning: str) -> dict[str, Any]:
-    return {"status": "not_available", "reason_code": reason_code, "provisional": True, "stage": None, "peak_confirmed": False, "warning": warning}
+    return {"status": "insufficient_data", "reason_code": reason_code, "provisional": True, "stage": None, "peak_confirmed": False, "warning": warning}
 
 
 def _frame(observations: list[DetailedObservation], sensor: str) -> pd.DataFrame:

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { Sprout, Menu, X, Leaf, LogIn, Droplets } from 'lucide-react';
+import { Sprout, Menu, X, Leaf, LogIn } from 'lucide-react';
 
 export const Navbar = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);

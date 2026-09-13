@@ -1,6 +1,8 @@
 # Cauvery SICKLE API
 
-FastAPI backend for Cauvery-only field validation, live Earth Engine retrieval, SICKLE paddy classification, provisional stage estimation, and PostGIS persistence.
+FastAPI backend for Cauvery-only field validation, live Earth Engine retrieval, SICKLE paddy classification, provisional growth-stage and moisture-stress estimation, FAO-56 weather/ET0 processing, provisional paddy water balance, irrigation advisory, and PostGIS persistence.
+
+Moisture stress is implemented and integrated but remains provisional. It is supporting evidence only: its score is never converted into millimetres and never determines irrigation quantity. Water balance and irrigation advice are also provisional until field validation is completed.
 
 ## Local setup
 

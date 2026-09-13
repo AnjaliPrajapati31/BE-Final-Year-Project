@@ -150,9 +150,9 @@ def _risk_label(score: float) -> str:
 # Data-quality gate
 # ---------------------------------------------------------------------------
 
-def _gate_failure(reason_code: str, message: str) -> dict[str, Any]:
+def _gate_failure(reason_code: str, message: str, status: str = "insufficient_data") -> dict[str, Any]:
     return {
-        "status": "insufficient_data",
+        "status": status,
         "reason_code": reason_code,
         "provisional": True,
         "stress_risk": None,
@@ -200,6 +200,7 @@ def estimate_stress(
         return _gate_failure(
             "NON_PADDY_STRESS_SKIPPED",
             "Moisture-stress analysis is only performed for Paddy fields.",
+            "skipped",
         )
 
     # --- Gate 1: Stage must be available -------------------------------------
@@ -217,6 +218,7 @@ def estimate_stress(
         return _gate_failure(
             "STAGE_MATURITY_STRESS_SKIPPED",
             "Field is at maturity or harvest. Natural senescence is not water stress.",
+            "skipped",
         )
 
     # --- Parse cycle start ---------------------------------------------------
@@ -230,21 +232,21 @@ def estimate_stress(
 
     # --- S2 optical data preparation ----------------------------------------
     s2_raw = _to_frame(observations, "S2")
+    if not s2_raw.empty:
+        raw_latest_cloud = pd.to_numeric(
+            pd.Series([s2_raw.iloc[-1].get("scene_cloud_percentage")]), errors="coerce"
+        ).iloc[0]
+        if pd.notna(raw_latest_cloud) and float(raw_latest_cloud) >= 80:
+            return _gate_failure(
+                "LATEST_OPTICAL_CLOUD_CONTAMINATED",
+                "The latest optical observation is severely cloud-affected and cannot be used for stress assessment.",
+            )
     s2 = _clean_s2(s2_raw, cycle_start)
 
     if s2 is None or len(s2) < 2:
         return _gate_failure(
             "INSUFFICIENT_S2_FOR_STRESS",
             "At least two usable optical observations within the crop cycle are required.",
-        )
-
-    # Gate: latest optical not severely cloud-contaminated
-    latest_s2 = s2.iloc[-1]
-    cloud_pct = latest_s2.get("scene_cloud_percentage", np.nan)
-    if pd.notna(cloud_pct) and float(cloud_pct) >= 80:
-        return _gate_failure(
-            "LATEST_OPTICAL_CLOUD_CONTAMINATED",
-            "The latest optical observation is severely cloud-affected and cannot be used for stress assessment.",
         )
 
     # --- S1 radar data preparation ------------------------------------------

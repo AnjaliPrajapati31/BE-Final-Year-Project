@@ -11,6 +11,28 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.config import BASE_DIR, settings
 
 
+def _can_adopt_stress_migration(connection, filename: str) -> bool:
+    """Recognize a verified 0004 schema that predates the migration ledger row."""
+    if filename != "0004_add_stress_results.sql":
+        return False
+    table_exists = connection.execute(
+        "SELECT to_regclass('public.stress_results') IS NOT NULL"
+    ).fetchone()[0]
+    column_exists = connection.execute(
+        """SELECT EXISTS (
+               SELECT 1 FROM information_schema.columns
+               WHERE table_schema='public' AND table_name='analysis_runs'
+                 AND column_name='stress_rule_version'
+           )"""
+    ).fetchone()[0]
+    constraint = connection.execute(
+        """SELECT pg_get_constraintdef(oid) FROM pg_constraint
+           WHERE conrelid='analysis_runs'::regclass
+             AND conname='analysis_runs_status_check'"""
+    ).fetchone()
+    return bool(table_exists and column_exists and constraint and "running_stress_rules" in constraint[0])
+
+
 def main() -> None:
     if not settings.DATABASE_URL:
         raise SystemExit("DATABASE_URL is required")
@@ -24,6 +46,13 @@ def main() -> None:
             if row:
                 if row[0] != checksum:
                     raise RuntimeError(f"Applied migration checksum changed: {path.name}")
+                continue
+            if _can_adopt_stress_migration(connection, path.name):
+                connection.execute(
+                    "INSERT INTO schema_migrations(filename,checksum) VALUES (%s,%s)",
+                    (path.name, checksum),
+                )
+                print(f"adopted {path.name} (verified existing schema)")
                 continue
             with connection.transaction():
                 connection.execute(raw.decode("utf-8"))

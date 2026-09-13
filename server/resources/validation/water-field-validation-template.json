@@ -1,0 +1,31 @@
+{
+  "schema_version": "water-validation-v1",
+  "fields": [],
+  "required_field_properties": [
+    "field_id",
+    "known_crop_label",
+    "sowing_date",
+    "transplanting_date",
+    "soil_description",
+    "has_dry_down_event",
+    "has_rainfall_or_irrigation_refill_event",
+    "observations"
+  ],
+  "observation_properties": [
+    "date",
+    "estimated_rainfall_mm",
+    "observed_rainfall_mm",
+    "calculated_et0_mm",
+    "reference_et0_mm",
+    "estimated_ponded_water_mm",
+    "observed_ponded_water_mm",
+    "estimated_root_depletion_mm",
+    "observed_root_depletion_mm",
+    "conservation_residual_mm"
+  ],
+  "notes": [
+    "Leave unavailable measurements null; never replace missing observations with zero.",
+    "Irrigation event dates and quantities remain in the audited irrigation-event API and should be referenced by field_id.",
+    "PILOT_001 must not be entered as water-balance truth because measured irrigation and field-water observations are absent."
+  ]
+}

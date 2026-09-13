@@ -14,6 +14,22 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.main import app
 
 
+def assert_stored_parity(client: TestClient, immediate: dict) -> None:
+    response = client.get(f"/api/v1/analyses/{immediate['request_id']}")
+    if response.status_code != 200:
+        raise SystemExit(f"Stored analysis retrieval failed: {response.json()}")
+    stored = response.json()["data"]
+    comparable_keys = (
+        "status", "provider", "data_quality", "crop", "growth_stage", "moisture_stress",
+        "modules", "weather", "water_balance", "irrigation_advisory", "charts",
+        "warnings", "artifacts", "provenance",
+    )
+    differences = [key for key in comparable_keys if immediate.get(key) != stored.get(key)]
+    if differences:
+        details = {key: {"immediate": immediate.get(key), "stored": stored.get(key)} for key in differences}
+        raise SystemExit(f"Immediate/stored response parity failed: {json.dumps(details, default=str)}")
+
+
 def main() -> None:
     fixture = json.loads(Path("tests/fixtures/sickle/pilot_001/pilot_001.geojson").read_text(encoding="utf-8"))
     pilot = shape(fixture["features"][0]["geometry"])
@@ -41,6 +57,7 @@ def main() -> None:
             if response.status_code != 200 or not payload.get("success"):
                 raise SystemExit(f"Live API analysis failed for {field_id}: {payload}")
             data = payload["data"]
+            assert_stored_parity(client, data)
             summaries.append(
                 {
                     "field_id": field_id,

@@ -9,6 +9,7 @@ from app.ml.sickle.runtime import SickleRuntime
 from app.services.sickle.crop import summarize_crop, validate_crop_inputs
 from app.services.sickle.providers.local_fixture import LocalFixtureProvider
 from app.services.sickle.stage import estimate_stage
+from app.services.sickle.stress import estimate_stress
 
 
 def main() -> None:
@@ -21,6 +22,7 @@ def main() -> None:
     runtime = SickleRuntime.load(Path("ml_models/sickle/checkpoint_best.pt"), "cpu", 1)
     crop = summarize_crop(runtime.infer(inputs.s1, inputs.s1_dates, inputs.s2, inputs.s2_dates), inputs.field_mask, inputs)
     stage = estimate_stage(fixture.detailed_series())
+    stress = estimate_stress(fixture.detailed_series(), stage, crop)
     checks = [
         crop["class_label"] == "Paddy",
         abs(crop["paddy_probability"] - 0.7029250264167786) <= 1e-4,
@@ -35,9 +37,13 @@ def main() -> None:
         stage["peak_confirmed"] is False,
         stage["selected_s1_orbit_pass"] == "DESCENDING",
         stage["selected_s1_orbit_number"] == 92,
+        stress["status"] == "completed",
+        stress["stress_risk"] == "No stress evidence",
+        abs(stress["stress_score"] - 0.05) <= 1e-6,
+        stress["latest_observation_date"] == "2025-10-31",
     ]
     if not all(checks):
-        raise SystemExit(f"PILOT_001 scientific parity gate FAILED\ncrop={crop}\nstage={stage}")
+        raise SystemExit(f"PILOT_001 scientific parity gate FAILED\ncrop={crop}\nstage={stage}\nstress={stress}")
     print("PILOT_001 scientific parity gate PASSED")
 
 

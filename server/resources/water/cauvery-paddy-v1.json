@@ -1,0 +1,35 @@
+{
+  "version": "cauvery-paddy-v1",
+  "status": "provisional",
+  "crop": "Paddy",
+  "sources": [
+    {
+      "name": "FAO Irrigation and Drainage Paper 56",
+      "url": "https://www.fao.org/4/X0490E/x0490e00.htm",
+      "use": "ETc = Kc × ET0, root-zone depletion and reference ET0 principles"
+    },
+    {
+      "name": "Tamil Nadu Agricultural University paddy water management",
+      "url": "https://www.agritech.tnau.ac.in/expert_system/paddy/cultivationpractices3.html",
+      "use": "shallow stage-dependent ponding guidance"
+    }
+  ],
+  "parameters": {
+    "field_capacity": {"value": 0.40, "unit": "m3/m3", "valid_range": [0.05, 0.70], "source": "default; replace with measured soil value"},
+    "wilting_point": {"value": 0.20, "unit": "m3/m3", "valid_range": [0.01, 0.60], "source": "default; replace with measured soil value"},
+    "root_depth_m": {"value": 0.50, "unit": "m", "valid_range": [0.10, 1.50], "source": "provisional paddy default"},
+    "depletion_fraction": {"value": 0.20, "unit": "fraction", "valid_range": [0.05, 1.00], "source": "provisional paddy default"},
+    "seepage_percolation_mm_day": {"value": 3.0, "unit": "mm/day", "valid_range": [0.0, 30.0], "source": "provisional base assumption"},
+    "seepage_low_mm_day": {"value": 1.0, "unit": "mm/day", "valid_range": [0.0, 30.0], "source": "sensitivity lower bound"},
+    "seepage_high_mm_day": {"value": 5.0, "unit": "mm/day", "valid_range": [0.0, 30.0], "source": "sensitivity upper bound"},
+    "irrigation_efficiency": {"value": 0.60, "unit": "fraction", "valid_range": [0.05, 1.00], "source": "provisional surface-irrigation default"},
+    "max_ponding_mm": {"value": 50.0, "unit": "mm", "valid_range": [0.0, 200.0], "source": "provisional bund-retention default"}
+  },
+  "stage_curve": [
+    {"day_start": 0, "day_end": 20, "stage": "Establishment / Transplanting", "kc_start": 1.05, "kc_end": 1.05, "target_ponding_mm": 25.0},
+    {"day_start": 21, "day_end": 55, "stage": "Vegetative / Tillering", "kc_start": 1.05, "kc_end": 1.20, "target_ponding_mm": 30.0},
+    {"day_start": 56, "day_end": 90, "stage": "Reproductive / Grain formation", "kc_start": 1.20, "kc_end": 1.20, "target_ponding_mm": 50.0},
+    {"day_start": 91, "day_end": 120, "stage": "Maturity / Harvest", "kc_start": 0.90, "kc_end": 0.60, "target_ponding_mm": 0.0},
+    {"day_start": 121, "day_end": null, "stage": "Post-harvest", "kc_start": 0.0, "kc_end": 0.0, "target_ponding_mm": 0.0}
+  ]
+}

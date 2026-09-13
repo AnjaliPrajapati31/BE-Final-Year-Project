@@ -159,7 +159,7 @@ export const WaterStress = () => {
   const stress = latestAnalysis?.moisture_stress ?? null;
   const crop = latestAnalysis?.crop ?? null;
   const stage = latestAnalysis?.growth_stage ?? null;
-  const charts = latestAnalysis?.charts ?? {};
+  const charts = useMemo(() => latestAnalysis?.charts ?? {}, [latestAnalysis?.charts]);
 
   const optical = useMemo(() => {
     const raw = stress?.chart_data?.optical ?? charts?.stress_optical ?? [];

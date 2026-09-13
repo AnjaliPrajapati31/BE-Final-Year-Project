@@ -10,6 +10,7 @@ from uuid import UUID
 
 import numpy as np
 from PIL import Image, ImageDraw
+import rasterio
 from rasterio.io import MemoryFile
 from rasterio.transform import Affine
 
@@ -57,6 +58,11 @@ class ArtifactWriter:
         stack = np.stack([probabilities[0], probabilities[1], classes]).astype(np.float32)
         stack[:, ~field_mask.astype(bool)] = nodata
         try:
+            # PostgreSQL/PostGIS installers on Windows can set PROJ_LIB and
+            # GDAL_DATA to versions incompatible with Rasterio's libraries.
+            rasterio_root = Path(rasterio.__file__).resolve().parent
+            os.environ["PROJ_LIB"] = str(rasterio_root / "proj_data")
+            os.environ["GDAL_DATA"] = str(rasterio_root / "gdal_data")
             with MemoryFile() as memory:
                 with memory.open(driver="GTiff", width=32, height=32, count=3, dtype="float32", crs=grid.crs, transform=Affine(*grid.transform), nodata=nodata, compress="deflate") as dataset:
                     dataset.write(stack)
@@ -101,7 +107,7 @@ class ArtifactWriter:
             raise DomainError("ARTIFACT_WRITE_FAILED", "Could not create the stage timeline artifact.", 500) from exc
         return self._write(request_id, "stage_curve", "png", "image/png", buffer.getvalue())
 
-    def write_analysis(self, request_id: UUID, crop: dict, stage: dict, probabilities: np.ndarray, inputs, stress: dict | None = None) -> tuple[list[dict], list[str]]:
+    def write_analysis(self, request_id: UUID, crop: dict, stage: dict, probabilities: np.ndarray, inputs, stress: dict | None = None, water_balance: dict | None = None, irrigation_advisory: dict | None = None) -> tuple[list[dict], list[str]]:
         artifacts: list[dict] = []
         warnings: list[str] = []
         operations = [
@@ -120,6 +126,14 @@ class ArtifactWriter:
                 lambda ch=chart: self.write_csv(request_id, "stress_optical_csv", ch.get("optical", [])),
                 lambda ch=chart: self.write_csv(request_id, "stress_radar_csv", ch.get("radar", [])),
             ]
+        if water_balance is not None:
+            balance_summary = {key: value for key, value in water_balance.items() if key != "daily"}
+            operations += [
+                lambda summary=balance_summary: self.write_json(request_id, "water_balance_summary_json", summary),
+                lambda rows=water_balance.get("daily", []): self.write_csv(request_id, "water_balance_daily_csv", rows),
+            ]
+        if irrigation_advisory is not None:
+            operations.append(lambda advisory=irrigation_advisory: self.write_json(request_id, "irrigation_advisory_json", advisory))
         for operation in operations:
             try:
                 artifacts.append(operation())

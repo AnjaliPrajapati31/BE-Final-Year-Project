@@ -9,8 +9,10 @@ Crop inference retains the PILOT_001 checkpoint/preprocessing regression gate. G
 - Crop, stage, and stress PILOT_001 known-answer assertions.
 - Stress skip, exclusion, insufficient-observation, persistence, corroboration, cloud, optional-radar, and malformed-value rules.
 - FAO-56 Penman–Monteith deterministic fixture and unit validation.
+- FAO-56 dynamic depletion fraction and water-stress coefficient after RAW.
 - GFS six-hour precipitation aggregation without overlapping-step double counting.
 - Paddy daily mass-conservation residual below `1e-6 mm` in fixtures.
+- Explicit measured-state assimilation with a non-assimilating validation mode.
 - ET0/Kc, rain, irrigation, seepage, overflow, dry-down, maturity, and sensitivity behavior.
 - Exact depth/area/volume and application-efficiency conversion.
 - Non-Paddy skip and module failure-isolation orchestration.
@@ -18,7 +20,7 @@ Crop inference retains the PILOT_001 checkpoint/preprocessing regression gate. G
 
 ## Field validation still required
 
-PILOT_001 has no measured irrigation quantities or field-water-depth record and is not water-balance truth. Before removing the provisional label, collect at least five Paddy fields with known crop-cycle dates, irrigation dates and quantities, local rain-gauge data, soil description, and periodic ponded/root-zone water observations. The set must include a dry-down and a rainfall/refill event.
+PILOT_001 has no measured irrigation quantities or field-water-depth record and is not water-balance truth. Before removing the provisional label, collect at least five Paddy fields with known crop-cycle dates, complete irrigation histories, local rain-gauge data, soil descriptions, and at least ten independent weather and field-water observation pairs per field. Validation replay must disable observation assimilation. The set must include a dry-down and a rainfall/refill event.
 
 Report rainfall bias/error, ET0 agreement, cumulative closure, ponding/depletion error, and sensitivity to seepage, soil, initial state, and unrecorded irrigation. Freeze any changed parameter values as a new profile version; never edit `cauvery-paddy-v1` silently.
 

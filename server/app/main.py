@@ -51,7 +51,10 @@ async def domain_error_handler(request: Request, exc: DomainError):
 
 @app.exception_handler(RequestValidationError)
 async def validation_error_handler(request: Request, exc: RequestValidationError):
-    return JSONResponse(error("Request validation failed.", "INVALID_GEOMETRY", getattr(request.state, "request_id", None)), status_code=422)
+    is_field_analysis = request.url.path.endswith("/fields/analyze")
+    code = "INVALID_GEOMETRY" if is_field_analysis else "INVALID_REQUEST"
+    message = "Check the field boundary and analysis inputs." if is_field_analysis else "Check the submitted values and try again."
+    return JSONResponse(error(message, code, getattr(request.state, "request_id", None)), status_code=422)
 
 
 app.include_router(fields_router)

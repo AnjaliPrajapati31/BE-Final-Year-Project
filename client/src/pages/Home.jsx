@@ -19,37 +19,37 @@ export const Home = () => {
       id: 1,
       title: 'Satellite-Based Crop Monitoring',
       description:
-        'Continuous high-resolution satellite telemetry tracking vegetation health index (NDVI), canopy density, and field performance in real-time from orbit.',
+        'Field-level Sentinel observations are retrieved when available and summarized with explicit dates, gaps, and quality warnings.',
       icon: Satellite,
     },
     {
       id: 2,
-      title: 'AI Crop Type Identification',
+      title: 'Satellite Crop Classification',
       description:
-        'Advanced deep neural vision models that automatically classify crop species, map precise field parcel boundaries, and analyze historical crop rotation.',
+        'The validated SICKLE runtime classifies submitted field polygons as Paddy or Non-Paddy from Sentinel-1 and Sentinel-2 observations.',
       icon: Brain,
     },
     {
       id: 3,
       title: 'Growth Stage Estimation',
       description:
-        'Phenological growth tracking algorithms predicting plant emergence, vegetative milestones, flowering windows, and optimal harvest timelines.',
+        'A provisional crop-cycle estimate uses cleaned satellite observations and clearly reports when stage evidence is insufficient.',
       icon: TrendingUp,
     },
     {
       id: 4,
       title: 'Water Stress Detection',
       description:
-        'Thermal infrared and multispectral NIR analysis detecting root-zone moisture deficits early, triggering automated precision irrigation recommendations.',
+        'Provisional optical and radar evidence identifies persistent moisture-stress risk separately from the deterministic water-balance calculation.',
       icon: Droplets,
     },
   ];
 
   const stats = [
-    { number: '25K+', label: 'Happy Farmers' },
-    { number: '1.2M+', label: 'Acres Monitored' },
-    { number: '30%', label: 'Average Yield Increase' },
-    { number: '40%', label: 'Water Saved' },
+    { number: 'S1 + S2', label: 'Satellite Inputs' },
+    { number: '6', label: 'Independent Modules' },
+    { number: '5-Day', label: 'Forecast Horizon' },
+    { number: '<1e-6', label: 'Balance Residual (mm)' },
   ];
 
   return (
@@ -89,7 +89,7 @@ export const Home = () => {
 
             {/* Subtitle Paragraph */}
             <p className="text-slate-700 text-sm sm:text-base lg:text-lg leading-relaxed max-w-xl font-semibold drop-shadow-2xs">
-              CropSense AI brings technology, insights, and expertise to help you increase yield, reduce costs, and build a sustainable future.
+              CropSense combines satellite crop evidence with a deterministic paddy water balance and transparent irrigation guidance.
             </p>
 
             {/* Action Buttons */}
@@ -130,7 +130,7 @@ export const Home = () => {
             Smart Solutions for Modern Farming
           </h2>
           <p className="text-slate-600 text-sm sm:text-base">
-            Everything you need to manage your farm efficiently and profitably.
+            A focused pilot workflow for field analysis and water decisions in the Cauvery Delta.
           </p>
         </div>
 
@@ -210,18 +210,18 @@ export const Home = () => {
             </h2>
 
             <p className="text-slate-600 text-sm sm:text-base leading-relaxed">
-              CropSense AI is your digital farming partner. Access real-time satellite telemetry data, expert recommendations, and smart tools - all in one place.
+              Review dated satellite observations, provisional crop evidence, weather inputs, water deficit, and irrigation guidance in one place.
             </p>
 
             {/* Checklist */}
             <div className="space-y-3.5 pt-2">
               <div className="flex items-center space-x-3 text-slate-800 font-semibold text-sm">
                 <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-                <span>Real-time field monitoring</span>
+                <span>Dated field observations and quality warnings</span>
               </div>
               <div className="flex items-center space-x-3 text-slate-800 font-semibold text-sm">
                 <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-                <span>AI-powered recommendations</span>
+                <span>Rule-based irrigation recommendations</span>
               </div>
               <div className="flex items-center space-x-3 text-slate-800 font-semibold text-sm">
                 <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
@@ -250,39 +250,37 @@ export const Home = () => {
                   {/* Header */}
                   <div className="flex justify-between items-center pb-2 border-b border-slate-200">
                     <div>
-                      <p className="text-[10px] text-slate-400">Hello, Farmer 👋</p>
-                      <p className="font-bold text-slate-800">Field Summary</p>
+                      <p className="text-[10px] text-slate-400">Cauvery Paddy Pilot</p>
+                      <p className="font-bold text-slate-800">Analysis workflow</p>
                     </div>
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                   </div>
 
-                  {/* Crop Health Card */}
                   <div className="bg-white p-3 rounded-xl border border-slate-100 shadow-xs space-y-1">
                     <div className="flex justify-between text-[11px] font-semibold text-slate-600">
-                      <span>Crop Health</span>
-                      <span className="text-emerald-600 font-bold">78%</span>
+                      <span>Satellite evidence</span>
+                      <span className="text-emerald-600 font-bold">S1 + S2</span>
                     </div>
                     <div className="w-full bg-slate-100 rounded-full h-1.5">
-                      <div className="bg-emerald-500 h-1.5 rounded-full w-[78%]"></div>
+                      <div className="bg-emerald-500 h-1.5 rounded-full w-full"></div>
                     </div>
                   </div>
 
-                  {/* Soil Moisture */}
                   <div className="bg-white p-3 rounded-xl border border-slate-100 shadow-xs space-y-1">
                     <div className="flex justify-between text-[11px] font-semibold text-slate-600">
-                      <span>Soil Moisture</span>
-                      <span className="text-sky-600 font-bold">65%</span>
+                      <span>Water balance</span>
+                      <span className="text-sky-600 font-bold">Daily ledger</span>
                     </div>
                     <div className="w-full bg-slate-100 rounded-full h-1.5">
-                      <div className="bg-sky-500 h-1.5 rounded-full w-[65%]"></div>
+                      <div className="bg-sky-500 h-1.5 rounded-full w-full"></div>
                     </div>
                   </div>
 
                   {/* Quick Activity */}
                   <div className="bg-[#18392B] text-white p-3 rounded-xl shadow-xs space-y-1">
-                    <p className="text-[10px] text-emerald-300 font-semibold">Upcoming Task</p>
-                    <p className="font-bold text-white text-[11px]">Irrigation Scheduled</p>
-                    <p className="text-[9px] text-emerald-200">Tonight at 8:00 PM</p>
+                    <p className="text-[10px] text-emerald-300 font-semibold">Irrigation guidance</p>
+                    <p className="font-bold text-white text-[11px]">Rule-based action</p>
+                    <p className="text-[9px] text-emerald-200">Depth · volume · reason</p>
                   </div>
                 </div>
               </div>
@@ -290,9 +288,9 @@ export const Home = () => {
               {/* Desktop Dashboard Card Preview */}
               <div className="flex-1 bg-white rounded-2xl p-5 border border-slate-200 shadow-md space-y-4 w-full">
                 <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                  <h4 className="font-bold text-slate-900 text-sm">Farm Overview</h4>
+                  <h4 className="font-bold text-slate-900 text-sm">What each analysis returns</h4>
                   <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full">
-                    Live Satellite
+                    Evidence aware
                   </span>
                 </div>
 
@@ -303,11 +301,11 @@ export const Home = () => {
                         FA
                       </div>
                       <div>
-                        <p className="font-bold text-slate-800 text-xs">Field A - Wheat</p>
-                        <p className="text-[10px] text-slate-500">12.5 Acres</p>
+                        <p className="font-bold text-slate-800 text-xs">Crop and growth stage</p>
+                        <p className="text-[10px] text-slate-500">With observation dates</p>
                       </div>
                     </div>
-                    <span className="text-xs font-bold text-emerald-600">Optimal</span>
+                    <span className="text-xs font-bold text-emerald-600">Module status</span>
                   </div>
 
                   <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-100">
@@ -316,11 +314,11 @@ export const Home = () => {
                         FB
                       </div>
                       <div>
-                        <p className="font-bold text-slate-800 text-xs">Field B - Corn</p>
-                        <p className="text-[10px] text-slate-500">8.3 Acres</p>
+                        <p className="font-bold text-slate-800 text-xs">Water and irrigation</p>
+                        <p className="text-[10px] text-slate-500">With assumptions shown</p>
                       </div>
                     </div>
-                    <span className="text-xs font-bold text-amber-600">Mild Stress</span>
+                    <span className="text-xs font-bold text-amber-600">Provisional</span>
                   </div>
                 </div>
 
@@ -353,7 +351,7 @@ export const Home = () => {
                 Together, let's build a greener and more prosperous tomorrow.
               </p>
               <p className="text-xs sm:text-sm text-slate-600 mt-0.5">
-                Join thousands of precision farmers leveraging CropSense AI satellite telemetry today.
+                Start with a Cauvery field polygon and keep measured irrigation and water observations with the analysis.
               </p>
             </div>
           </div>

@@ -47,6 +47,22 @@ def build_validation_report(fields: list[dict]) -> dict:
         "root_depletion_mm": paired_error_metrics(all_rows, "estimated_root_depletion_mm", "observed_root_depletion_mm"),
         "maximum_conservation_residual_mm": max(residuals, default=None),
     }
+    water_pair_counts = []
+    weather_pair_counts = []
+    for field in fields:
+        observations = field.get("observations", [])
+        water_pair_counts.append(sum(
+            (row.get("estimated_ponded_water_mm") not in (None, "") and row.get("observed_ponded_water_mm") not in (None, ""))
+            or (row.get("estimated_root_depletion_mm") not in (None, "") and row.get("observed_root_depletion_mm") not in (None, ""))
+            for row in observations
+        ))
+        weather_pair_counts.append(sum(
+            row.get("estimated_rainfall_mm") not in (None, "")
+            and row.get("observed_rainfall_mm") not in (None, "")
+            and row.get("calculated_et0_mm") not in (None, "")
+            and row.get("reference_et0_mm") not in (None, "")
+            for row in observations
+        ))
     requirements = {
         "at_least_five_fields": field_count >= 5,
         "unique_nonempty_field_ids": field_count == len(fields) and field_count > 0,
@@ -55,6 +71,12 @@ def build_validation_report(fields: list[dict]) -> dict:
             field.get("sowing_date") or field.get("transplanting_date") for field in fields
         ),
         "soil_descriptions_present": bool(fields) and all(field.get("soil_description") for field in fields),
+        "irrigation_history_complete": bool(fields) and all(
+            field.get("irrigation_history_coverage") == "complete" for field in fields
+        ),
+        "validation_assimilation_disabled": bool(fields) and all(
+            field.get("assimilation_enabled") is False for field in fields
+        ),
         "dry_down_event_present": dry_down_count >= 1,
         "refill_event_present": refill_count >= 1,
         "rainfall_pairs_present": metrics["rainfall_mm"]["sample_count"] > 0,
@@ -63,6 +85,8 @@ def build_validation_report(fields: list[dict]) -> dict:
             metrics["ponded_water_mm"]["sample_count"] > 0
             or metrics["root_depletion_mm"]["sample_count"] > 0
         ),
+        "at_least_ten_water_pairs_per_field": bool(fields) and all(count >= 10 for count in water_pair_counts),
+        "at_least_ten_weather_pairs_per_field": bool(fields) and all(count >= 10 for count in weather_pair_counts),
         "mass_conservation_verified": bool(residuals) and max(residuals) < 1e-6,
     }
     ready = all(requirements.values())
@@ -71,6 +95,12 @@ def build_validation_report(fields: list[dict]) -> dict:
         "water_deficit_accuracy_publishable": ready,
         "field_count": field_count,
         "observation_count": len(all_rows),
+        "water_pair_counts_by_field": {
+            str(field.get("field_id")): count for field, count in zip(fields, water_pair_counts)
+        },
+        "weather_pair_counts_by_field": {
+            str(field.get("field_id")): count for field, count in zip(fields, weather_pair_counts)
+        },
         "dry_down_field_count": dry_down_count,
         "refill_field_count": refill_count,
         "requirements": requirements,

@@ -39,6 +39,7 @@ def aggregate_gfs_rows(rows: list[dict], *, latitude_deg: float, start: date, da
         radiation = sum(max(0.0, float(row["downward_shortwave_radiation_flux"])) * 21600 / 1_000_000 for row in day_rows)
         forecast_date = date.fromisoformat(day_text)
         creation_value = day_rows[0].get("creation_time")
+        creation_time = None
         if isinstance(creation_value, (int, float)):
             creation_time = datetime.fromtimestamp(float(creation_value) / 1000.0, tz=timezone.utc)
             age_hours = max(0.0, (datetime.now(timezone.utc) - creation_time).total_seconds() / 3600.0)
@@ -53,12 +54,54 @@ def aggregate_gfs_rows(rows: list[dict], *, latitude_deg: float, start: date, da
             radiation, relative_humidity_pct=humidity,
         ))
         output.append(DailyWeather(
-            forecast_date,
-            sum(max(0.0, float(row["total_precipitation_surface"])) for row in day_rows),
-            et0, "forecast", FORECAST_SOURCE,
-            "coarse_model_forecast;6_hour_steps;" + ET0_ALGORITHM_VERSION + ";" + run_quality,
+            date=forecast_date,
+            rainfall_mm=sum(max(0.0, float(row["total_precipitation_surface"])) for row in day_rows),
+            et0_mm=et0, kind="forecast", source=FORECAST_SOURCE,
+            quality="coarse_model_forecast;6_hour_steps;" + ET0_ALGORITHM_VERSION + ";" + run_quality,
+            raw_variables={
+                "temperature_min_c": min(temperatures), "temperature_max_c": max(temperatures),
+                "relative_humidity_pct": humidity, "wind_speed_10m_ms": wind,
+                "solar_radiation_mj_m2_day": radiation,
+                "precipitation_6h_mm": [max(0.0, float(row["total_precipitation_surface"])) for row in day_rows],
+                "forecast_hours": [int(row["forecast_hours"]) for row in day_rows],
+                "elevation_m": elevation_m,
+            },
+            model_creation_time=creation_time, spatial_resolution_m=27830,
         ))
     return [row for row in output if row.date >= start][:days]
+
+
+def select_gfs_historical_bridge(
+    rows: list[dict], *, latitude_deg: float, start: date, days: int,
+    rainfall_by_date: dict[str, float], elevation_m: float = 0.0,
+) -> list[DailyWeather]:
+    """Choose one complete, short-range GFS run per missing local day."""
+    by_creation: dict[int, list[dict]] = defaultdict(list)
+    for row in rows:
+        creation = row.get("creation_time")
+        if isinstance(creation, (int, float)):
+            by_creation[int(creation)].append(row)
+    candidates: dict[date, DailyWeather] = {}
+    for creation, run_rows in by_creation.items():
+        for item in aggregate_gfs_rows(run_rows, latitude_deg=latitude_deg, start=start, days=days, elevation_m=elevation_m):
+            if len(item.raw_variables.get("forecast_hours", [])) != 4:
+                continue
+            previous = candidates.get(item.date)
+            if previous is None or (previous.model_creation_time or datetime.min.replace(tzinfo=timezone.utc)) < item.model_creation_time:
+                rainfall = rainfall_by_date.get(item.date.isoformat(), item.rainfall_mm)
+                candidates[item.date] = DailyWeather(
+                    date=item.date, rainfall_mm=rainfall, et0_mm=item.et0_mm, kind="historical",
+                    source=(HISTORICAL_SOURCES[0] + "+" + FORECAST_SOURCE
+                            if item.date.isoformat() in rainfall_by_date else FORECAST_SOURCE),
+                    quality="near_real_time_gfs_bridge;short_range_6_hour_steps;" + ET0_ALGORITHM_VERSION,
+                    raw_variables={**item.raw_variables, "rainfall_source": (
+                        HISTORICAL_SOURCES[0] if item.date.isoformat() in rainfall_by_date else FORECAST_SOURCE
+                    )},
+                    model_creation_time=item.model_creation_time,
+                    retrieved_at=item.retrieved_at,
+                    spatial_resolution_m=item.spatial_resolution_m,
+                )
+    return [candidates[current] for current in (start + timedelta(days=index) for index in range(days)) if current in candidates]
 
 
 class EarthEngineWeatherProvider:
@@ -82,7 +125,14 @@ class EarthEngineWeatherProvider:
             return None
         try:
             values = json.loads(path.read_text(encoding="utf-8"))
-            return [DailyWeather(date.fromisoformat(row["date"]), row["rainfall_mm"], row["et0_mm"], row["kind"], row["source"], row["quality"]) for row in values]
+            return [DailyWeather(
+                date=date.fromisoformat(row["date"]), rainfall_mm=row["rainfall_mm"], et0_mm=row["et0_mm"],
+                kind=row["kind"], source=row["source"], quality=row["quality"],
+                raw_variables=row.get("raw_variables", {}),
+                model_creation_time=(datetime.fromisoformat(row["model_creation_time"]) if row.get("model_creation_time") else None),
+                retrieved_at=(datetime.fromisoformat(row["retrieved_at"]) if row.get("retrieved_at") else datetime.now(timezone.utc)),
+                spatial_resolution_m=row.get("spatial_resolution_m"),
+            ) for row in values]
         except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError):
             return None
 
@@ -104,6 +154,42 @@ class EarthEngineWeatherProvider:
     @staticmethod
     def _features(info: dict) -> list[dict]:
         return [item.get("properties", {}) for item in info.get("features", [])]
+
+    def _historical_gfs_bridge(
+        self, geometry: ValidatedGeometry, start: date, end: date, request_id: str,
+        rainfall_by_date: dict[str, float], elevation_m: float,
+    ) -> list[DailyWeather]:
+        ee = self._ee()
+        region = ee.Geometry(mapping(geometry.geometry))
+        location = region.centroid(1)
+        collection = (ee.ImageCollection(FORECAST_SOURCE).filterBounds(region)
+                      .filterDate(ee.Date(start.isoformat()).advance(-1, "day"),
+                                  ee.Date(end.isoformat()).advance(1, "day"))
+                      .filter(ee.Filter.inList("forecast_hours", [6, 12, 18, 24])))
+
+        def feature(image):
+            values = image.select([
+                "temperature_2m_above_ground", "relative_humidity_2m_above_ground",
+                "u_component_of_wind_10m_above_ground", "v_component_of_wind_10m_above_ground",
+                "total_precipitation_surface", "downward_shortwave_radiation_flux",
+            ]).reduceRegion(reducer=ee.Reducer.first(), geometry=location, scale=25000, maxPixels=100000)
+            local_time = ee.Date(image.get("forecast_time")).advance(330, "minute")
+            return ee.Feature(None, values).set({
+                "date": local_time.format("YYYY-MM-dd"),
+                "forecast_hours": image.get("forecast_hours"),
+                "creation_time": image.get("creation_time"),
+            })
+
+        try:
+            with ee.data.workloadTagContext(request_id):
+                info = collection.map(feature).getInfo()
+        except Exception as exc:
+            raise DomainError("GFS_HISTORY_BRIDGE_UNAVAILABLE", "Recent GFS bridge data could not be retrieved.", 503) from exc
+        return select_gfs_historical_bridge(
+            self._features(info), latitude_deg=geometry.geometry.centroid.y,
+            start=start, days=(end - start).days + 1,
+            rainfall_by_date=rainfall_by_date, elevation_m=elevation_m,
+        )
 
     def historical(self, geometry: ValidatedGeometry, start: date, end: date, request_id: str) -> list[DailyWeather]:
         if end < start:
@@ -152,8 +238,13 @@ class EarthEngineWeatherProvider:
         except Exception as exc:
             raise DomainError("HISTORICAL_WEATHER_UNAVAILABLE", "Historical rainfall or ET0 inputs could not be retrieved.", 503) from exc
 
+        feature_rows = self._features(info)
+        rainfall_by_date = {
+            str(row["date"]): max(0.0, float(row["rainfall_mm"]))
+            for row in feature_rows if row.get("date") and row.get("rainfall_mm") is not None
+        }
         output: list[DailyWeather] = []
-        for row in self._features(info):
+        for row in feature_rows:
             required = ("rainfall_mm", "temperature_2m_min", "temperature_2m_max", "dewpoint_temperature_2m",
                         "u_component_of_wind_10m", "v_component_of_wind_10m", "surface_solar_radiation_downwards_sum")
             if not row.get("date") or any(row.get(key) is None for key in required):
@@ -169,9 +260,22 @@ class EarthEngineWeatherProvider:
                 solar_radiation_mj_m2_day=float(row["surface_solar_radiation_downwards_sum"]) / 1_000_000.0,
             )
             output.append(DailyWeather(
-                observed_date, max(0.0, float(row["rainfall_mm"])), fao56_penman_monteith(variables),
-                "historical", "+".join(HISTORICAL_SOURCES),
-                "coarse_satellite_rainfall_and_reanalysis;" + ET0_ALGORITHM_VERSION,
+                date=observed_date, rainfall_mm=max(0.0, float(row["rainfall_mm"])),
+                et0_mm=fao56_penman_monteith(variables), kind="historical",
+                source="+".join(HISTORICAL_SOURCES),
+                quality="coarse_satellite_rainfall_and_reanalysis;" + ET0_ALGORITHM_VERSION,
+                raw_variables={
+                    "temperature_min_k": float(row["temperature_2m_min"]),
+                    "temperature_max_k": float(row["temperature_2m_max"]),
+                    "dewpoint_temperature_k": float(row["dewpoint_temperature_2m"]),
+                    "u_wind_10m_ms": float(row["u_component_of_wind_10m"]),
+                    "v_wind_10m_ms": float(row["v_component_of_wind_10m"]),
+                    "surface_pressure_pa": None if row.get("surface_pressure") is None else float(row["surface_pressure"]),
+                    "solar_radiation_j_m2_day": float(row["surface_solar_radiation_downwards_sum"]),
+                    "elevation_m": float(row.get("elevation_m") or 0),
+                    "rainfall_mm": max(0.0, float(row["rainfall_mm"])),
+                },
+                spatial_resolution_m=10000,
             ))
         output.sort(key=lambda item: item.date)
         if not output or output[0].date != start:
@@ -180,6 +284,18 @@ class EarthEngineWeatherProvider:
             if current.date != previous.date + timedelta(days=1):
                 raise DomainError("INCOMPLETE_HISTORICAL_WEATHER", "Historical weather contains an internal missing day.", 503)
         trailing_gap = (end - output[-1].date).days
+        if 0 < trailing_gap <= 10:
+            bridge_start = output[-1].date + timedelta(days=1)
+            try:
+                bridge = self._historical_gfs_bridge(
+                    geometry, bridge_start, end, request_id, rainfall_by_date,
+                    float(feature_rows[0].get("elevation_m") or 0),
+                )
+                if len(bridge) == trailing_gap and bridge[0].date == bridge_start:
+                    output.extend(bridge)
+                    trailing_gap = (end - output[-1].date).days
+            except DomainError:
+                pass
         if trailing_gap > 30:
             raise DomainError("STALE_HISTORICAL_WEATHER", "Historical weather is more than thirty days behind the requested date.", 503)
         self._write_cache(cache_key, output)

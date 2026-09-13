@@ -12,19 +12,19 @@ Complete. Crop, growth stage, moisture stress, weather, water balance, and irrig
 
 ## Stage 2 — Field water profile and irrigation history
 
-Complete for backend operation. `cauvery-paddy-v1` is machine-readable and includes units, ranges, sources, stage Kc values, ponding targets, seepage sensitivity, and irrigation efficiency. Water-profile and audited irrigation-event APIs persist geometry revision, original amount/unit, normalized gross/net depth, source, corrections, and void history.
+Complete for backend operation. `cauvery-paddy-v1` is machine-readable and includes units, ranges, sources, stage Kc values, ponding targets, seepage sensitivity, and irrigation efficiency. Water-profile and audited irrigation-event APIs persist geometry revision, original amount/unit, normalized gross/net depth, source, corrections, and void history. Audited field-water observations and irrigation-history coverage declarations are now supported and remain bound to their original field revision.
 
 ## Stage 3 — Historical and forecast weather
 
-Complete and live-tested. Historical rainfall uses GPM IMERG, meteorology uses ERA5-Land, and ET0 is computed in the backend with FAO-56 Penman–Monteith. GFS uses one complete model run, local-day aggregation, and disjoint six-hour precipitation steps. Cache keys include geometry, dates/horizon, collections, ET0 version, mode, timezone, and GFS creation time. Coarse resolution and data lag are explicit.
+Complete and live-tested. Historical rainfall uses GPM IMERG, meteorology uses ERA5-Land, and ET0 is computed in the backend with FAO-56 Penman–Monteith. GFS uses one complete model run, local-day aggregation, and disjoint six-hour precipitation steps. Daily rows now preserve raw ET0 variables, retrieval/model time, and spatial scale. A short-range GFS bridge is attempted for a trailing ERA5-Land gap; it never fills an internal gap or fabricates a partial local day.
 
 ## Stage 4 — Paddy water balance
 
-Complete as a pure deterministic module. The daily ledger covers rainfall, recorded net irrigation, ETc, seepage/percolation, ponding, root depletion, runoff, deficit, sensitivity range, triggers, and mass-conservation residual. Maturity/post-harvest does not trigger ordinary refill.
+Complete as a pure deterministic module under `paddy-daily-v2`. The daily ledger separates potential and actual ETc, applies the FAO-56 depletion/stress coefficient after RAW, and covers rainfall, recorded net irrigation, seepage/percolation, ponding, root depletion, runoff, deficit, trigger type, measured-state adjustment, and mass-conservation residual. Operational observations may be assimilated explicitly; validation replay can disable assimilation. Maturity/post-harvest does not trigger ordinary refill.
 
 ## Stage 5 — Scientific field validation
 
-Infrastructure complete; measured validation data pending. The validation harness computes paired bias/MAE/RMSE and fails closed unless at least five unique known-Paddy fields, crop-cycle dates, soil descriptions, dry-down/refill events, rainfall/ET0 pairs, field-water observations, and conservation evidence are present. No water-deficit accuracy claim is currently publishable.
+Infrastructure complete; measured validation data pending. The validation harness computes paired bias/MAE/RMSE and fails closed unless at least five unique known-Paddy fields, crop-cycle dates, soil descriptions, complete irrigation histories, dry-down/refill events, and at least ten independent weather and field-water pairs per field are present with assimilation disabled. No water-deficit accuracy claim is currently publishable.
 
 ## Stage 6 — Orchestrator, database, API, artifacts
 
@@ -32,11 +32,13 @@ Complete. Migrations 0005–0009 persist module runs, profiles, irrigation histo
 
 ## Stage 7 — Irrigation advisory
 
-Complete as a provisional rules engine. It returns action, depth, volume, urgency, trigger/crossing information, credited forecast rainfall, reasons, assumptions, and evidence. Missing forecasts degrade to current-state monitoring; stale historical state blocks advice entirely.
+Complete as provisional `paddy-advisory-v2`. It returns action, depth, volume, urgency, trigger/crossing information, credited forecast rainfall, reasons, assumptions, and evidence. Rain-delay advice now includes the deterministic fallback depth and volume if forecast rain does not occur. Missing forecasts degrade to current-state monitoring; stale historical state blocks advice entirely.
 
 ## Stage 8 — Operational hardening
 
 Automated and live software gates complete. Failure isolation, Non-Paddy skipping, missing stage/weather, stale historical data, invalid profiles, database-write failure, cache behavior, correction history, and artifacts are tested. Readiness reports ROI, checkpoint, database, schema, satellite, historical weather, forecast weather, and artifact storage independently.
+
+An optional on-demand AI explanation endpoint is implemented after the deterministic pipeline. It receives only a redacted bounded summary, uses strict structured output with remote storage disabled, is cached against the authoritative context hash, and is persisted as explicitly non-authoritative. Missing AI configuration or an AI-provider failure cannot affect analysis or readiness.
 
 Remaining external gate: ingest measured observations for the five-field validation set and freeze any scientifically justified parameter changes as a new profile version.
 

@@ -14,7 +14,10 @@ def health():
 @router.get("/health/ready")
 def readiness(request: Request):
     dependencies = request.app.state.dependencies
-    ready = bool(dependencies) and all(item.get("ready", False) for item in dependencies.values()) and request.app.state.analysis_service is not None
+    ready = bool(dependencies) and all(
+        item.get("ready", False) or item.get("required") is False
+        for item in dependencies.values()
+    ) and request.app.state.analysis_service is not None
     payload = {
         "success": ready,
         "message": "Service is ready" if ready else "Service is not ready",

@@ -1,17 +1,25 @@
 import { useState } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { Sprout, Menu, X, Leaf, LogIn } from 'lucide-react';
+import { Sprout, Menu, X, Leaf } from 'lucide-react';
+import { useApp } from '../contexts/AppContext';
 
 export const Navbar = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const { latestRequestId, fieldId } = useApp();
+  const analysisQuery = latestRequestId
+    ? `?requestId=${encodeURIComponent(latestRequestId)}${fieldId ? `&fieldId=${encodeURIComponent(fieldId)}` : ''}`
+    : '';
 
   const navLinks = [
     { name: 'Home', path: '/' },
     { name: 'My Fields', path: '/fields' },
-    { name: 'Analytics', path: '/dashboard' },
-    { name: 'Water Stress', path: '/water-stress' },
+    { name: 'Results', path: `/dashboard${analysisQuery}`, basePath: '/dashboard' },
+    { name: 'Water Stress', path: `/water-stress${analysisQuery}`, basePath: '/water-stress' },
+    { name: 'Weather', path: `/weather${analysisQuery}`, basePath: '/weather' },
+    { name: 'Irrigation', path: `/recommendations${analysisQuery}`, basePath: '/recommendations' },
+    { name: 'Field Data', path: `/settings${fieldId ? `?fieldId=${encodeURIComponent(fieldId)}` : ''}`, basePath: '/settings' },
   ];
 
 
@@ -37,9 +45,10 @@ export const Navbar = () => {
         </NavLink>
 
         {/* Center: Navigation Links */}
-        <nav className="hidden md:flex items-center space-x-8">
+        <nav className="hidden md:flex items-center space-x-5">
           {navLinks.map((link) => {
-            const isActive = location.pathname === link.path || (link.path !== '/' && location.pathname.startsWith(link.path));
+            const matchPath = link.basePath || link.path;
+            const isActive = location.pathname === matchPath || (matchPath !== '/' && location.pathname.startsWith(matchPath));
             if (link.locked) {
               return (
                 <button
@@ -74,15 +83,6 @@ export const Navbar = () => {
 
         {/* Right: Login + Get Started */}
         <div className="flex items-center space-x-3">
-          {/* Login Button */}
-          <button
-            onClick={() => alert('Login Modal: Please sign in to your CropSense AI account.')}
-            className="hidden sm:flex items-center space-x-1.5 px-4 py-2.5 rounded-full border border-slate-300 text-slate-800 font-semibold text-sm hover:bg-slate-100 transition-all cursor-pointer shadow-xs"
-          >
-            <LogIn className="w-4 h-4 text-emerald-700" />
-            <span>Login</span>
-          </button>
-
           {/* Get Started Button */}
           <button
             onClick={() => navigate('/fields')}
@@ -106,7 +106,8 @@ export const Navbar = () => {
       {mobileMenuOpen && (
         <div className="md:hidden bg-white border-b border-slate-200 px-4 py-4 space-y-2 shadow-xl">
           {navLinks.map((link) => {
-            const isActive = location.pathname === link.path || (link.path !== '/' && location.pathname.startsWith(link.path));
+            const matchPath = link.basePath || link.path;
+            const isActive = location.pathname === matchPath || (matchPath !== '/' && location.pathname.startsWith(matchPath));
             if (link.locked) {
               return (
                 <div
@@ -136,16 +137,6 @@ export const Navbar = () => {
             );
           })}
           <div className="pt-3 border-t border-slate-100 space-y-2">
-            <button
-              onClick={() => {
-                setMobileMenuOpen(false);
-                alert('Login Modal: Please sign in to your CropSense AI account.');
-              }}
-              className="w-full flex items-center justify-center space-x-2 border border-slate-300 text-slate-800 px-5 py-3 rounded-xl font-bold text-sm"
-            >
-              <LogIn className="w-4 h-4 text-emerald-700" />
-              <span>Login</span>
-            </button>
             <button
               onClick={() => {
                 setMobileMenuOpen(false);

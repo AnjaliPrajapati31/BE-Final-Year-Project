@@ -40,6 +40,16 @@ class Settings(BaseSettings):
     CROP_MIN_S2_OBSERVATIONS: int = 1
     SICKLE_ARTIFACTS_ENABLED: bool = False
     SICKLE_ARTIFACT_ROOT: str = "artifacts/sickle"
+    AI_EXPLANATION_ENABLED: bool = False
+    AI_EXPLANATION_API_KEY: str | None = None
+    AI_EXPLANATION_MODEL: str | None = None
+    AI_EXPLANATION_ENDPOINT: str = "https://api.openai.com/v1/responses"
+    AI_EXPLANATION_TIMEOUT_SECONDS: int = 30
+    AI_EXPLANATION_ENABLED: bool = False
+    AI_EXPLANATION_API_KEY: str | None = None
+    AI_EXPLANATION_MODEL: str | None = None
+    AI_EXPLANATION_ENDPOINT: str = "https://api.openai.com/v1/responses"
+    AI_EXPLANATION_TIMEOUT_SECONDS: int = 30
 
     def path(self, value: str) -> Path:
         candidate = Path(value)

@@ -28,6 +28,7 @@ def test_complete_five_field_fixture_opens_validation_gate():
         fields.append({
             "field_id": f"FIELD_{index}", "known_crop_label": "Paddy",
             "transplanting_date": "2025-06-01", "soil_description": "clay loam",
+            "irrigation_history_coverage": "complete", "assimilation_enabled": False,
             "has_dry_down_event": index == 0,
             "has_rainfall_or_irrigation_refill_event": index == 1,
             "observations": [{
@@ -36,7 +37,7 @@ def test_complete_five_field_fixture_opens_validation_gate():
                 "estimated_ponded_water_mm": 20, "observed_ponded_water_mm": 20,
                 "estimated_root_depletion_mm": None, "observed_root_depletion_mm": None,
                 "conservation_residual_mm": 0,
-            }],
+            } for _ in range(10)],
         })
     result = build_validation_report(fields)
     assert result["status"] == "validation_complete"

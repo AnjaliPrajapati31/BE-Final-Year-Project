@@ -1,5 +1,6 @@
 import { Outlet, useLocation } from 'react-router-dom';
 import { Navbar } from '../components/Navbar';
+import { AnalysisAssistant } from '../components/AnalysisAssistant';
 
 export const DashboardLayout = () => {
   const location = useLocation();
@@ -20,6 +21,7 @@ export const DashboardLayout = () => {
           </div>
         )}
       </main>
+      <AnalysisAssistant />
     </div>
   );
 };

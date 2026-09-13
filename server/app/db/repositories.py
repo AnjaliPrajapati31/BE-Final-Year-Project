@@ -7,7 +7,7 @@ from psycopg.rows import dict_row
 
 from app.core.exceptions import DomainError
 from app.services.sickle.geometry import ValidatedGeometry
-from app.services.water.contracts import IrrigationDepth
+from app.services.water.contracts import IrrigationDepth, WaterObservation
 from app.services.water.irrigation import normalize_irrigation
 
 
@@ -40,13 +40,17 @@ class AnalysisRepository:
             "analysis_runs", "stress_results", "analysis_module_runs", "irrigation_events",
             "weather_daily", "water_balance_results", "water_balance_daily",
             "irrigation_advisory_results", "analysis_result_payloads",
+            "field_water_observations", "irrigation_history_coverage",
+            "analysis_explanations",
         )
         with self.pool.connection() as connection, connection.cursor() as cursor:
             cursor.execute(
-                "SELECT filename FROM schema_migrations WHERE filename IN (%s,%s,%s,%s,%s,%s)",
+                "SELECT filename FROM schema_migrations WHERE filename IN (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
                 ("0004_add_stress_results.sql", "0005_add_water_platform.sql",
                  "0006_add_analysis_payloads.sql", "0007_extend_canonical_payloads.sql",
-                 "0008_version_field_revision_by_roi.sql", "0009_add_canonical_chart_payload.sql"),
+                 "0008_version_field_revision_by_roi.sql", "0009_add_canonical_chart_payload.sql",
+                 "0010_add_field_water_observations.sql", "0011_extend_weather_provenance.sql",
+                 "0012_add_analysis_explanations.sql"),
             )
             migrations = {row[0] for row in cursor.fetchall()}
             cursor.execute(
@@ -60,6 +64,9 @@ class AnalysisRepository:
             "0006_add_analysis_payloads.sql", "0007_extend_canonical_payloads.sql",
             "0008_version_field_revision_by_roi.sql",
             "0009_add_canonical_chart_payload.sql",
+            "0010_add_field_water_observations.sql",
+            "0011_extend_weather_provenance.sql",
+            "0012_add_analysis_explanations.sql",
         } - migrations)
         return {
             "ready": not missing_tables and not missing_migrations,
@@ -416,14 +423,172 @@ class AnalysisRepository:
             )
             return [IrrigationDepth(row["event_date"], row["net_depth_mm"]) for row in cursor.fetchall()]
 
+    def create_water_observation(self, field_code: str, observation: dict) -> dict:
+        with self.pool.connection() as connection, connection.transaction(), connection.cursor(row_factory=dict_row) as cursor:
+            field = self._current_field_revision(cursor, field_code)
+            if field is None:
+                raise DomainError("FIELD_NOT_FOUND", "Field has no accepted geometry revision.", 404)
+            client_id = observation.get("client_observation_id")
+            if client_id:
+                cursor.execute(
+                    "SELECT id FROM field_water_observations WHERE field_id=%s AND client_observation_id=%s",
+                    (field["field_id"], client_id),
+                )
+                if cursor.fetchone():
+                    raise DomainError("DUPLICATE_WATER_OBSERVATION", "This water observation already exists.", 409)
+            cursor.execute(
+                """SELECT id FROM field_water_observations
+                   WHERE field_id=%s AND observed_at=%s AND observation_type=%s
+                     AND original_value=%s AND original_unit=%s AND method=%s AND status='active'""",
+                (field["field_id"], observation["observed_at"], observation["observation_type"],
+                 observation["value"], observation["unit"], observation["method"]),
+            )
+            if cursor.fetchone():
+                raise DomainError("DUPLICATE_WATER_OBSERVATION", "An identical active water observation already exists.", 409)
+            supersedes = observation.get("supersedes_observation_id")
+            if supersedes:
+                cursor.execute(
+                    "SELECT id,status FROM field_water_observations WHERE id=%s AND field_id=%s FOR UPDATE",
+                    (supersedes, field["field_id"]),
+                )
+                prior = cursor.fetchone()
+                if prior is None or prior["status"] != "active":
+                    raise DomainError("WATER_OBSERVATION_NOT_CORRECTABLE", "The referenced active observation was not found.", 409)
+                cursor.execute(
+                    "UPDATE field_water_observations SET status='voided',voided_at=now(),correction_reason=%s WHERE id=%s",
+                    (observation["correction_reason"], supersedes),
+                )
+            kind = observation["observation_type"]
+            value = float(observation["value"])
+            normalized = {
+                "ponded_depth": (value, None, None),
+                "water_table_depth": (None, value, None),
+                "volumetric_soil_water": (None, None, value),
+            }[kind]
+            cursor.execute(
+                """INSERT INTO field_water_observations(
+                       field_id,field_revision_id,observed_at,observation_type,original_value,original_unit,
+                       ponded_depth_mm,water_table_depth_mm,volumetric_soil_water,measurement_depth_m,
+                       method,source,reliability,client_observation_id,supersedes_observation_id,correction_reason
+                   ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                   RETURNING *,%s::integer AS field_revision_number,%s::double precision AS field_area_m2""",
+                (field["field_id"], field["revision_id"], observation["observed_at"], kind, value,
+                 observation["unit"], *normalized, observation.get("measurement_depth_m"), observation["method"],
+                 observation["source"], observation["reliability"], client_id, supersedes,
+                 observation.get("correction_reason"), field["revision_number"], field["area_m2"]),
+            )
+            return dict(cursor.fetchone())
+
+    def list_water_observations(self, field_code: str, *, active_only: bool = False) -> list[dict]:
+        suffix = " AND observation.status='active'" if active_only else ""
+        with self.pool.connection() as connection, connection.cursor(row_factory=dict_row) as cursor:
+            cursor.execute(
+                """SELECT observation.*,revision.revision_number AS field_revision_number,
+                          revision.area_m2 AS field_area_m2
+                   FROM fields field
+                   JOIN field_water_observations observation ON observation.field_id=field.id
+                   JOIN field_revisions revision ON revision.id=observation.field_revision_id
+                   WHERE field.field_code=%s""" + suffix + " ORDER BY observation.observed_at,observation.created_at",
+                (field_code,),
+            )
+            return [dict(row) for row in cursor.fetchall()]
+
+    def void_water_observation(self, field_code: str, observation_id: UUID, reason: str) -> dict:
+        with self.pool.connection() as connection, connection.transaction(), connection.cursor(row_factory=dict_row) as cursor:
+            cursor.execute(
+                """UPDATE field_water_observations observation
+                   SET status='voided',voided_at=now(),correction_reason=%s
+                   FROM fields field
+                   WHERE observation.id=%s AND observation.field_id=field.id
+                     AND field.field_code=%s AND observation.status='active'
+                   RETURNING observation.*""",
+                (reason, observation_id, field_code),
+            )
+            row = cursor.fetchone()
+            if row is None:
+                raise DomainError("WATER_OBSERVATION_NOT_FOUND", "Active water observation was not found.", 404)
+            return dict(row)
+
+    def save_irrigation_history_coverage(self, field_code: str, declaration: dict) -> dict:
+        with self.pool.connection() as connection, connection.transaction(), connection.cursor(row_factory=dict_row) as cursor:
+            field = self._current_field_revision(cursor, field_code)
+            if field is None:
+                raise DomainError("FIELD_NOT_FOUND", "Field has no accepted geometry revision.", 404)
+            cursor.execute(
+                """UPDATE irrigation_history_coverage SET status='superseded',superseded_at=now()
+                   WHERE field_id=%s AND status='active'""",
+                (field["field_id"],),
+            )
+            cursor.execute(
+                """INSERT INTO irrigation_history_coverage(
+                       field_id,field_revision_id,coverage_start,coverage_end,coverage_status,source,notes
+                   ) VALUES (%s,%s,%s,%s,%s,%s,%s)
+                   RETURNING *,%s::integer AS field_revision_number""",
+                (field["field_id"], field["revision_id"], declaration.get("coverage_start"),
+                 declaration.get("coverage_end"), declaration["coverage_status"], declaration["source"],
+                 declaration.get("notes"), field["revision_number"]),
+            )
+            return dict(cursor.fetchone())
+
+    def get_irrigation_history_coverage(self, field_code: str) -> dict | None:
+        with self.pool.connection() as connection, connection.cursor(row_factory=dict_row) as cursor:
+            cursor.execute(
+                """SELECT coverage.*,revision.revision_number AS field_revision_number
+                   FROM fields field
+                   JOIN irrigation_history_coverage coverage ON coverage.field_id=field.id
+                   JOIN field_revisions revision ON revision.id=coverage.field_revision_id
+                   WHERE field.field_code=%s AND coverage.status='active'""",
+                (field_code,),
+            )
+            row = cursor.fetchone()
+            return None if row is None else dict(row)
+
+    def irrigation_history_complete(self, field_code: str, start, end) -> bool:
+        coverage = self.get_irrigation_history_coverage(field_code)
+        return bool(
+            coverage
+            and coverage["coverage_status"] == "complete"
+            and coverage["coverage_start"] <= start
+            and coverage["coverage_end"] >= end
+        )
+
+    def water_observations(self, field_code: str, start, end) -> list[WaterObservation]:
+        with self.pool.connection() as connection, connection.cursor(row_factory=dict_row) as cursor:
+            field = self._current_field_revision(cursor, field_code)
+            if field is None:
+                return []
+            cursor.execute(
+                """SELECT (observed_at AT TIME ZONE 'Asia/Kolkata')::date AS observation_date,
+                          observation_type,original_value,source,reliability,measurement_depth_m
+                   FROM field_water_observations
+                   WHERE field_id=%s AND field_revision_id=%s AND status='active'
+                     AND (observed_at AT TIME ZONE 'Asia/Kolkata')::date BETWEEN %s AND %s
+                   ORDER BY observed_at""",
+                (field["field_id"], field["revision_id"], start, end),
+            )
+            return [WaterObservation(
+                date=row["observation_date"], observation_type=row["observation_type"],
+                value=row["original_value"], source=row["source"], reliability=row["reliability"],
+                measurement_depth_m=row["measurement_depth_m"],
+            ) for row in cursor.fetchall()]
+
     def save_weather(self, request_id: UUID, rows: list) -> None:
-        values = [(request_id,row.date,row.kind,row.source,row.rainfall_mm,row.et0_mm,row.quality) for row in rows]
+        values = [(
+            request_id,row.date,row.kind,row.source,row.rainfall_mm,row.et0_mm,str(row.quality),
+            json.dumps(row.raw_variables, default=str),row.model_creation_time,row.retrieved_at,row.spatial_resolution_m,
+        ) for row in rows]
         if values:
             with self.pool.connection() as connection, connection.transaction(), connection.cursor() as cursor:
                 cursor.executemany(
-                    """INSERT INTO weather_daily(request_id,weather_date,kind,source,rainfall_mm,et0_mm,quality)
-                       VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT(request_id,weather_date,kind) DO UPDATE SET
-                       source=EXCLUDED.source,rainfall_mm=EXCLUDED.rainfall_mm,et0_mm=EXCLUDED.et0_mm,quality=EXCLUDED.quality""", values,
+                    """INSERT INTO weather_daily(
+                           request_id,weather_date,kind,source,rainfall_mm,et0_mm,quality,raw_variables,
+                           model_creation_time,retrieved_at,spatial_resolution_m
+                       ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s,%s,%s)
+                       ON CONFLICT(request_id,weather_date,kind) DO UPDATE SET
+                       source=EXCLUDED.source,rainfall_mm=EXCLUDED.rainfall_mm,et0_mm=EXCLUDED.et0_mm,
+                       quality=EXCLUDED.quality,raw_variables=EXCLUDED.raw_variables,
+                       model_creation_time=EXCLUDED.model_creation_time,retrieved_at=EXCLUDED.retrieved_at,
+                       spatial_resolution_m=EXCLUDED.spatial_resolution_m""", values,
                 )
 
     def save_water_balance(self, request_id: UUID, result: dict) -> None:
@@ -472,6 +637,32 @@ class AnalysisRepository:
         with self.pool.connection() as connection, connection.cursor(row_factory=dict_row) as cursor:
             cursor.execute("SELECT result_type,payload FROM analysis_result_payloads WHERE request_id=%s", (request_id,))
             return {row["result_type"]: row["payload"] for row in cursor.fetchall()}
+
+    def get_explanation(self, request_id: UUID, language: str, provider: str, model: str,
+                        prompt_version: str, context_hash: str) -> dict | None:
+        with self.pool.connection() as connection, connection.cursor(row_factory=dict_row) as cursor:
+            cursor.execute(
+                """SELECT language,provider,model,prompt_version,authoritative,context_sha256,explanation,created_at
+                   FROM analysis_explanations
+                   WHERE request_id=%s AND language=%s AND provider=%s AND model=%s
+                     AND prompt_version=%s AND context_sha256=%s""",
+                (request_id, language, provider, model, prompt_version, context_hash),
+            )
+            return cursor.fetchone()
+
+    def save_explanation(self, request_id: UUID, language: str, provider: str, model: str,
+                         prompt_version: str, context_hash: str, explanation: dict) -> dict:
+        with self.pool.connection() as connection, connection.transaction(), connection.cursor(row_factory=dict_row) as cursor:
+            cursor.execute(
+                """INSERT INTO analysis_explanations(
+                       request_id,language,provider,model,prompt_version,authoritative,context_sha256,explanation
+                   ) VALUES (%s,%s,%s,%s,%s,FALSE,%s,%s::jsonb)
+                   ON CONFLICT(request_id,language,provider,model,prompt_version,context_sha256)
+                   DO UPDATE SET explanation=EXCLUDED.explanation, created_at=now()
+                   RETURNING language,provider,model,prompt_version,authoritative,context_sha256,explanation,created_at""",
+                (request_id, language, provider, model, prompt_version, context_hash, json.dumps(explanation)),
+            )
+            return cursor.fetchone()
 
     def get_water_results(self, request_id: UUID) -> dict:
         with self.pool.connection() as connection, connection.cursor(row_factory=dict_row) as cursor:

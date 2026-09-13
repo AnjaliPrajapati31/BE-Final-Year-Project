@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from math import isfinite
 
-IRRIGATION_RULE_VERSION = "paddy-advisory-v1"
+IRRIGATION_RULE_VERSION = "paddy-advisory-v2"
 
 
 def build_irrigation_advisory(
@@ -34,9 +34,11 @@ def build_irrigation_advisory(
     current_deficit = float(current["water_deficit_mm"])
     crossing_index = next((index for index, row in enumerate(forecast_daily[:5]) if row.get("trigger_crossed")), None)
 
+    fallback_net = None
     if current.get("trigger_crossed"):
         if credited_rain >= current_deficit and current_deficit > 0:
             action, urgency, net, reason = "delay_for_rain", "low", 0.0, "Credited rain within two days covers the current refill requirement."
+            fallback_net = current_deficit
         else:
             action, urgency, net, reason = "irrigate_now", "high", current_deficit, "The current paddy water state has crossed its stage-specific trigger."
     elif not forecast_daily:
@@ -55,6 +57,15 @@ def build_irrigation_advisory(
 
     gross = net / efficiency
     volume = gross * area / 1000.0
+    fallback_gross = None if fallback_net is None else fallback_net / efficiency
+    fallback_volume = None if fallback_gross is None else fallback_gross * area / 1000.0
+    timing = {
+        "irrigate_now": "now",
+        "irrigate_soon": "within_2_days",
+        "monitor": "recheck_daily",
+        "delay_for_rain": "recheck_after_forecast_rain",
+        "no_irrigation_required": "none_within_5_days",
+    }[action]
     warnings = list(balance.get("warnings", []))
     if not forecast_daily:
         warnings.append("Forecast is unavailable; this recommendation uses current deficit only.")
@@ -62,8 +73,12 @@ def build_irrigation_advisory(
         "status": "completed", "action": action, "reason_code": None,
         "provisional": True, "evidence_level": balance.get("evidence_level", "low"),
         "rule_version": IRRIGATION_RULE_VERSION, "urgency": urgency, "reason": reason,
+        "recommended_timing": timing, "trigger_type": current.get("trigger_type"),
         "net_depth_mm": round(net, 3), "gross_depth_mm": round(gross, 3),
         "volume_m3": round(volume, 3), "irrigation_efficiency": efficiency,
+        "fallback_net_depth_mm": None if fallback_net is None else round(fallback_net, 3),
+        "fallback_gross_depth_mm": None if fallback_gross is None else round(fallback_gross, 3),
+        "fallback_volume_m3": None if fallback_volume is None else round(fallback_volume, 3),
         "forecast_rainfall_credited_mm": round(credited_rain, 3),
         "trigger_crossing_date": None if crossing_index is None else forecast_daily[crossing_index]["date"],
         "warnings": warnings,

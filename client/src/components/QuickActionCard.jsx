@@ -18,7 +18,7 @@ export const QuickActionCard = ({ onAddField, onCheckRecommendation, onRecordIrr
           className="flex items-center justify-center space-x-2 py-3 px-4 rounded-xl bg-sky-700 hover:bg-sky-800 text-white font-medium text-sm transition-all shadow-xs active:scale-[0.99] cursor-pointer"
         >
           <Sparkles className="w-4 h-4" />
-          <span>Check AI Rec</span>
+          <span>View Irrigation Advice</span>
         </button>
 
         <button

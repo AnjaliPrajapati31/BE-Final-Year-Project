@@ -12,7 +12,7 @@ from .crop import PREPROCESSING_VERSION, summarize_crop, validate_crop_inputs
 from .geometry import validate_geometry
 from .stage import STAGE_RULE_VERSION, estimate_stage, skipped_non_paddy, unavailable
 from .stress import STRESS_RULE_VERSION, estimate_stress
-from app.services.water.advisory import build_irrigation_advisory
+from app.services.water.advisory import IRRIGATION_RULE_VERSION, build_irrigation_advisory
 from app.services.water.balance import calculate_paddy_balance
 from app.services.water.contracts import DailyWeather, WaterState
 from app.services.water.profiles import CAUVERY_PADDY_V1
@@ -25,6 +25,14 @@ def _strip_chart_data(stress: dict | None) -> dict | None:
     if stress is None:
         return None
     return {key: value for key, value in stress.items() if key != "chart_data"}
+
+
+def _weather_payload(row: DailyWeather) -> dict:
+    payload = dict(row.__dict__)
+    payload["date"] = row.date.isoformat()
+    payload["model_creation_time"] = None if row.model_creation_time is None else row.model_creation_time.isoformat()
+    payload["retrieved_at"] = row.retrieved_at.isoformat()
+    return payload
 
 
 def _module_contract(result: dict, *, evidence_level: str | None = None, rule_version: str | None = None) -> dict:
@@ -222,7 +230,8 @@ class AnalysisService:
                     cycle_source = "transplanting_date" if command.transplanting_date_hint else (
                         "sowing_date" if command.sowing_date_hint else "satellite_stage"
                     )
-                    end_date = min(date(command.year, 12, 31), date.today())
+                    latest_complete_day = date.today() - timedelta(days=1)
+                    end_date = min(date(command.year, 12, 31), latest_complete_day)
                     historical = self.weather_provider.historical(geometry, cycle_start, end_date, str(request_id))
                     historical_lag_days = (end_date - historical[-1].date).days
                     forecast = []
@@ -230,7 +239,7 @@ class AnalysisService:
                     forecast_warning = None
                     if command.year == date.today().year:
                         try:
-                            forecast = self.weather_provider.forecast(geometry, date.today() + timedelta(days=1), 5, str(request_id))
+                            forecast = self.weather_provider.forecast(geometry, end_date + timedelta(days=1), 5, str(request_id))
                             advisory_forecast = forecast
                             if len(forecast) < 5:
                                 advisory_forecast = []
@@ -245,7 +254,8 @@ class AnalysisService:
                     weather_result = {
                         "status": "completed", "provisional": False, "evidence_level": "low", "reason_code": None,
                         "historical_days": len(historical), "forecast_days": len(forecast),
-                        "historical": [item.__dict__ for item in historical], "forecast": [item.__dict__ for item in forecast],
+                        "historical": [_weather_payload(item) for item in historical],
+                        "forecast": [_weather_payload(item) for item in forecast],
                         "historical_as_of_date": historical[-1].date.isoformat(),
                         "historical_lag_days": historical_lag_days,
                         "warnings": ["Rainfall and meteorology are coarse spatial estimates, not field gauge measurements."]
@@ -272,11 +282,20 @@ class AnalysisService:
                             initial_state = WaterState(float(initial_depletion or 0), float(target if initial_ponded is None else initial_ponded))
                             initial_state_source = "measured" if stored_profile.get("source") == "measured" else "user_profile"
                     irrigation = self.repository.irrigation_depths(command.field_id, cycle_start, end_date) if hasattr(self.repository, "irrigation_depths") else []
+                    water_observations = (
+                        self.repository.water_observations(command.field_id, cycle_start, historical[-1].date)
+                        if hasattr(self.repository, "water_observations") else []
+                    )
+                    irrigation_history_complete = (
+                        self.repository.irrigation_history_complete(command.field_id, cycle_start, historical[-1].date)
+                        if hasattr(self.repository, "irrigation_history_complete") else False
+                    )
                     self.repository.set_status(request_id, "running_water_balance")
                     water_balance = calculate_paddy_balance(
                         historical, irrigation, profile, cycle_start,
                         initial_state=initial_state, initial_state_source=initial_state_source,
-                        cycle_start_source=cycle_source, irrigation_history_complete=False,
+                        cycle_start_source=cycle_source, irrigation_history_complete=irrigation_history_complete,
+                        water_observations=water_observations,
                     )
                     water_chart = water_balance["daily"]
                     if hasattr(self.repository, "save_water_balance"):
@@ -298,7 +317,7 @@ class AnalysisService:
                             conservative_forecast, [], profile, cycle_start,
                             initial_state=WaterState(**water_balance["final_state"]),
                             initial_state_source="calculated", cycle_start_source=cycle_source,
-                            irrigation_history_complete=False,
+                            irrigation_history_complete=irrigation_history_complete,
                         )
                         projected_rows = projection["daily"]
                         for row in projected_rows:
@@ -308,7 +327,7 @@ class AnalysisService:
                         irrigation_advisory = {
                             "status": "insufficient_data", "action": "unavailable",
                             "reason_code": "HISTORICAL_WEATHER_STALE", "provisional": True,
-                            "evidence_level": "low", "rule_version": "paddy-advisory-v1",
+                            "evidence_level": "low", "rule_version": IRRIGATION_RULE_VERSION,
                             "urgency": None, "reason": "The latest water-balance state is not current enough for irrigation advice.",
                             "net_depth_mm": None, "gross_depth_mm": None, "volume_m3": None,
                             "irrigation_efficiency": profile.irrigation_efficiency,

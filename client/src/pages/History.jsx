@@ -4,6 +4,7 @@ import { AlertTriangle, Calendar, CheckCircle2, Database, ArrowRight } from 'luc
 import { EmptyState, LoadingSpinner, SectionHeader } from '../components/UIHelpers';
 import { useApp } from '../contexts/AppContext';
 import { ApiError, getFieldHistory } from '../services/api';
+import { presentError, presentOverallStatus } from '../lib/presentation';
 
 const formatDateTime = (value) => {
   if (!value) return 'Not available';
@@ -68,10 +69,11 @@ export const History = () => {
   }
 
   if (error) {
+    const message = presentError(error);
     return (
       <EmptyState
-        title={error.code || 'History unavailable'}
-        description={`${error.message}${error.requestId ? ` Request ID: ${error.requestId}` : ''}`}
+        title={message.title}
+        description={message.message}
         icon={AlertTriangle}
       />
     );
@@ -126,7 +128,7 @@ export const History = () => {
                   <td className="py-3.5 px-4">
                     <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">
                       <CheckCircle2 className="w-3 h-3" />
-                      <span>{item.status}</span>
+                      <span>{presentOverallStatus(item.status)}</span>
                     </span>
                   </td>
                   <td className="py-3.5 px-4">

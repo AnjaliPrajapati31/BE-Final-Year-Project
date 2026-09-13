@@ -22,8 +22,10 @@ import {
   TrendingDown,
   TrendingUp,
 } from 'lucide-react';
-import { EmptyState, SectionHeader } from '../components/UIHelpers';
+import { EmptyState, LoadingSpinner, SectionHeader } from '../components/UIHelpers';
 import { useApp } from '../contexts/AppContext';
+import { useCurrentAnalysis } from '../hooks/useCurrentAnalysis';
+import { presentError } from '../lib/presentation';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -154,7 +156,8 @@ const Pill = ({ label, desc }) => (
 
 // ─── Main component ────────────────────────────────────────────────────────────
 export const WaterStress = () => {
-  const { activeField, latestAnalysisSummary: latestAnalysis } = useApp();
+  const { activeField } = useApp();
+  const { analysis: latestAnalysis, loading, error } = useCurrentAnalysis();
 
   const stress = latestAnalysis?.moisture_stress ?? null;
   const crop = latestAnalysis?.crop ?? null;
@@ -176,6 +179,12 @@ export const WaterStress = () => {
     () => optical.filter((r) => r.stress_marker).map((r) => r.date),
     [optical]
   );
+
+  if (loading) return <LoadingSpinner />;
+  if (error && !latestAnalysis) {
+    const message = presentError(error);
+    return <EmptyState title={message.title} description={message.message} icon={AlertTriangle} />;
+  }
 
   // Non-Paddy skip
   if (crop && crop.class_label !== 'Paddy') {

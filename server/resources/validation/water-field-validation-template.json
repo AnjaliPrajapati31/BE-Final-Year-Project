@@ -7,6 +7,8 @@
     "sowing_date",
     "transplanting_date",
     "soil_description",
+    "irrigation_history_coverage",
+    "assimilation_enabled",
     "has_dry_down_event",
     "has_rainfall_or_irrigation_refill_event",
     "observations"
@@ -26,6 +28,8 @@
   "notes": [
     "Leave unavailable measurements null; never replace missing observations with zero.",
     "Irrigation event dates and quantities remain in the audited irrigation-event API and should be referenced by field_id.",
-    "PILOT_001 must not be entered as water-balance truth because measured irrigation and field-water observations are absent."
+    "PILOT_001 must not be entered as water-balance truth because measured irrigation and field-water observations are absent.",
+    "Validation replays must set assimilation_enabled to false so observations remain independent truth.",
+    "Each field requires at least ten paired weather rows and ten paired field-water rows."
   ]
 }

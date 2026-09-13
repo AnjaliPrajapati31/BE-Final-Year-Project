@@ -8,9 +8,18 @@ from app.config import settings
 
 from app.core.exceptions import DomainError
 from app.schemas.field_analysis import FieldAnalysisRequest
-from app.schemas.water import FieldWaterProfileUpdate, IrrigationEventCreate, IrrigationEventVoid
+from app.schemas.explanation import ExplanationRequest
+from app.schemas.water import (
+    FieldWaterProfileUpdate,
+    IrrigationEventCreate,
+    IrrigationEventVoid,
+    IrrigationHistoryCoverageUpdate,
+    WaterObservationCreate,
+    WaterObservationVoid,
+)
 from app.services.water.balance import validate_profile
 from app.services.water.profiles import CAUVERY_PADDY_V1
+from app.services.explanation import PROMPT_VERSION, PROVIDER, build_redacted_context, context_sha256
 from app.utils.response import success
 
 router = APIRouter(prefix="/api/v1", tags=["Field Analysis"])
@@ -131,6 +140,32 @@ def retrieve_analysis(request_id: UUID, request: Request):
     return success("Stored field analysis retrieved", result)
 
 
+@router.post("/analyses/{request_id}/explanation")
+def generate_analysis_explanation(request_id: UUID, command: ExplanationRequest, request: Request):
+    repository = _repository(request)
+    row = repository.get_analysis(request_id)
+    if row is None:
+        raise DomainError("ANALYSIS_NOT_FOUND", "Analysis was not found.", 404)
+    provider = request.app.state.explanation_provider
+    if provider is None or not provider.enabled:
+        raise DomainError("AI_EXPLANATION_UNAVAILABLE", "AI explanation is not configured.", 503)
+    payloads = repository.get_result_payloads(request_id)
+    payloads["modules"] = repository.get_module_runs(request_id)
+    context = build_redacted_context(row, payloads, repository.get_water_results(request_id))
+    digest = context_sha256(context)
+    if not command.regenerate:
+        cached = repository.get_explanation(
+            request_id, command.language, PROVIDER, provider.model, PROMPT_VERSION, digest,
+        )
+        if cached is not None:
+            return success("Stored AI explanation retrieved", {**cached, "cached": True})
+    explanation = provider.explain(context, command.language)
+    stored = repository.save_explanation(
+        request_id, command.language, PROVIDER, provider.model, PROMPT_VERSION, digest, explanation,
+    )
+    return success("AI explanation generated", {**stored, "cached": False})
+
+
 
 @router.get("/fields/{field_id}/analyses")
 def field_history(request: Request, field_id: str, limit: int = Query(20, ge=1, le=100), offset: int = Query(0, ge=0)):
@@ -173,6 +208,35 @@ def list_irrigation_events(field_id: str, request: Request):
 def void_irrigation_event(field_id: str, event_id: UUID, command: IrrigationEventVoid, request: Request):
     result = _repository(request).void_irrigation_event(field_id, event_id, command.reason)
     return success("Irrigation event voided", result)
+
+
+@router.post("/fields/{field_id}/water-observations", status_code=201)
+def create_water_observation(field_id: str, command: WaterObservationCreate, request: Request):
+    result = _repository(request).create_water_observation(field_id, command.model_dump())
+    return success("Field-water observation stored", result)
+
+
+@router.get("/fields/{field_id}/water-observations")
+def list_water_observations(field_id: str, request: Request):
+    return success("Field-water observation history retrieved", _repository(request).list_water_observations(field_id))
+
+
+@router.post("/fields/{field_id}/water-observations/{observation_id}/void")
+def void_water_observation(field_id: str, observation_id: UUID, command: WaterObservationVoid, request: Request):
+    result = _repository(request).void_water_observation(field_id, observation_id, command.reason)
+    return success("Field-water observation voided", result)
+
+
+@router.put("/fields/{field_id}/irrigation-history-coverage")
+def update_irrigation_history_coverage(field_id: str, command: IrrigationHistoryCoverageUpdate, request: Request):
+    result = _repository(request).save_irrigation_history_coverage(field_id, command.model_dump())
+    return success("Irrigation-history coverage stored", result)
+
+
+@router.get("/fields/{field_id}/irrigation-history-coverage")
+def retrieve_irrigation_history_coverage(field_id: str, request: Request):
+    result = _repository(request).get_irrigation_history_coverage(field_id)
+    return success("Irrigation-history coverage retrieved", result or {"coverage_status": "unknown"})
 
 
 @router.get("/analyses/{request_id}/artifacts/{artifact_type}")

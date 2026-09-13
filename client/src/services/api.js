@@ -107,4 +107,40 @@ export const getHealth = async () => unwrapEnvelope(api.get('/health'));
 
 export const getReadiness = async () => unwrapEnvelope(api.get('/health/ready'));
 
+export const getWaterProfile = async (fieldId) => unwrapEnvelope(
+  api.get(`/api/v1/fields/${encodeURIComponent(fieldId)}/water-profile`),
+);
+
+export const updateWaterProfile = async (fieldId, payload) => unwrapEnvelope(
+  api.put(`/api/v1/fields/${encodeURIComponent(fieldId)}/water-profile`, payload),
+);
+
+export const getIrrigationEvents = async (fieldId) => unwrapEnvelope(
+  api.get(`/api/v1/fields/${encodeURIComponent(fieldId)}/irrigation-events`),
+);
+
+export const createIrrigationEvent = async (fieldId, payload) => unwrapEnvelope(
+  api.post(`/api/v1/fields/${encodeURIComponent(fieldId)}/irrigation-events`, payload),
+);
+
+export const getWaterObservations = async (fieldId) => unwrapEnvelope(
+  api.get(`/api/v1/fields/${encodeURIComponent(fieldId)}/water-observations`),
+);
+
+export const createWaterObservation = async (fieldId, payload) => unwrapEnvelope(
+  api.post(`/api/v1/fields/${encodeURIComponent(fieldId)}/water-observations`, payload),
+);
+
+export const getIrrigationHistoryCoverage = async (fieldId) => unwrapEnvelope(
+  api.get(`/api/v1/fields/${encodeURIComponent(fieldId)}/irrigation-history-coverage`),
+);
+
+export const updateIrrigationHistoryCoverage = async (fieldId, payload) => unwrapEnvelope(
+  api.put(`/api/v1/fields/${encodeURIComponent(fieldId)}/irrigation-history-coverage`, payload),
+);
+
+export const generateAnalysisExplanation = async (requestId, language = 'en') => unwrapEnvelope(
+  api.post(`/api/v1/analyses/${encodeURIComponent(requestId)}/explanation`, { language, regenerate: false }),
+);
+
 export default api;

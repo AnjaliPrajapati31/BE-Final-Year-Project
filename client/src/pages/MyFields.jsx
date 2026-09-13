@@ -6,6 +6,7 @@ import { SectionHeader } from '../components/UIHelpers';
 import { MapPin, Plus, Globe, Layers, Trash2, CheckCircle, Navigation, Info, RefreshCw, ArrowRight, Send, MousePointerClick, LoaderCircle, AlertTriangle } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { analyzeField, ApiError, deriveFieldId, pointsToPolygonGeoJson } from '../services/api';
+import { presentError } from '../lib/presentation';
 
 // Cauvery Delta Region Bounds (Tamil Nadu, India)
 const CAUVERY_DELTA_CENTER = [10.85, 79.35];
@@ -268,11 +269,8 @@ export const MyFields = () => {
           <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
             <div>
-              <div className="font-semibold">{submitError.message}</div>
-              <div className="text-xs text-red-700">
-                {submitError.code}
-                {submitError.requestId ? ` · Request ID ${submitError.requestId}` : ''}
-              </div>
+              <div className="font-semibold">{presentError(submitError).title}</div>
+              <div className="text-xs text-red-700">{presentError(submitError).message}</div>
             </div>
           </div>
         )}
@@ -496,7 +494,7 @@ export const MyFields = () => {
           <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center space-x-2 text-xs text-slate-600 font-medium">
               <Send className="w-4 h-4 text-emerald-700 shrink-0" />
-              <span>Submit these {points.length} boundary coordinates to run live Cauvery crop analysis from the FastAPI backend.</span>
+              <span>Submit these {points.length} boundary coordinates to run the Cauvery field analysis.</span>
             </div>
             <button
               type="button"

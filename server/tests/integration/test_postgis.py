@@ -1,6 +1,6 @@
 import os
 from contextlib import contextmanager
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
@@ -46,8 +46,12 @@ def test_water_migrations_are_recorded_and_tables_exist(connection):
         "0006_add_analysis_payloads.sql", "0007_extend_canonical_payloads.sql",
         "0008_version_field_revision_by_roi.sql",
         "0009_add_canonical_chart_payload.sql",
+        "0010_add_field_water_observations.sql", "0011_extend_weather_provenance.sql",
+        "0012_add_analysis_explanations.sql",
     } <= names
-    for table in ("analysis_module_runs", "irrigation_events", "weather_daily", "water_balance_results", "irrigation_advisory_results"):
+    for table in ("analysis_module_runs", "irrigation_events", "weather_daily", "water_balance_results",
+                  "irrigation_advisory_results", "field_water_observations", "irrigation_history_coverage",
+                  "analysis_explanations"):
         assert connection.execute("SELECT to_regclass(%s)", (f"public.{table}",)).fetchone()[0] == table
 
 
@@ -111,6 +115,66 @@ def test_irrigation_events_are_geometry_bound_auditable_and_deduplicated(connect
         connection.rollback()
 
 
+def test_water_observations_and_history_coverage_are_audited(connection):
+    class RollbackFixture(Exception):
+        pass
+
+    class SameConnectionPool:
+        @contextmanager
+        def connection(self):
+            yield connection
+
+    field_code = f"WATER_OBS_{uuid4().hex[:10]}"
+    try:
+        try:
+            with connection.transaction():
+                roi_id = connection.execute("SELECT id FROM supported_regions WHERE active=TRUE LIMIT 1").fetchone()[0]
+                field_id = connection.execute("INSERT INTO fields(field_code) VALUES (%s) RETURNING id", (field_code,)).fetchone()[0]
+                revision_id = connection.execute(
+                    """INSERT INTO field_revisions(field_id,revision_number,geometry,geometry_hash,patch_footprint,
+                       area_m2,width_m,height_m,field_pixel_count,roi_id)
+                       VALUES (%s,1,ST_Multi(ST_MakeEnvelope(79.3,10.8,79.301,10.801,4326)),%s,
+                       ST_MakeEnvelope(79.2995,10.7995,79.3015,10.8015,4326),10000,110,110,100,%s) RETURNING id""",
+                    (field_id, uuid4().hex, roi_id),
+                ).fetchone()[0]
+                repository = AnalysisRepository(SameConnectionPool(), settings.CAUVERY_ROI_CODE)
+                observed_at = datetime(2025, 7, 1, 3, tzinfo=timezone.utc)
+                observation = {
+                    "observed_at": observed_at, "observation_type": "ponded_depth", "value": 25.0,
+                    "unit": "mm", "measurement_depth_m": None, "method": "field ruler", "source": "user",
+                    "reliability": "high", "client_observation_id": "obs-1",
+                    "supersedes_observation_id": None, "correction_reason": None,
+                }
+                created = repository.create_water_observation(field_code, observation)
+                assert created["field_revision_id"] == revision_id
+                assert created["ponded_depth_mm"] == 25
+                with pytest.raises(DomainError) as duplicate:
+                    repository.create_water_observation(field_code, observation)
+                assert duplicate.value.code == "DUPLICATE_WATER_OBSERVATION"
+                corrected = repository.create_water_observation(field_code, {
+                    **observation, "value": 20.0, "client_observation_id": "obs-2",
+                    "supersedes_observation_id": created["id"], "correction_reason": "ruler reread",
+                })
+                assert [row["status"] for row in repository.list_water_observations(field_code)] == ["voided", "active"]
+                repository.void_water_observation(field_code, corrected["id"], "measurement withdrawn")
+                coverage = repository.save_irrigation_history_coverage(field_code, {
+                    "coverage_start": date(2025, 6, 1), "coverage_end": date(2025, 7, 31),
+                    "coverage_status": "complete", "source": "measured", "notes": "field log checked",
+                })
+                assert coverage["field_revision_id"] == revision_id
+                assert repository.irrigation_history_complete(field_code, date(2025, 6, 1), date(2025, 7, 1))
+                repository.save_irrigation_history_coverage(field_code, {
+                    "coverage_start": None, "coverage_end": None, "coverage_status": "unknown",
+                    "source": "user", "notes": None,
+                })
+                assert not repository.irrigation_history_complete(field_code, date(2025, 6, 1), date(2025, 7, 1))
+                raise RollbackFixture()
+        except RollbackFixture:
+            pass
+    finally:
+        connection.rollback()
+
+
 def test_all_migrations_build_a_fresh_schema_transactionally(connection):
     class RollbackFixture(Exception):
         pass
@@ -129,6 +193,7 @@ def test_all_migrations_build_a_fresh_schema_transactionally(connection):
                     "stage_results", "stress_results", "analysis_module_runs", "irrigation_events",
                     "weather_daily", "water_balance_results", "water_balance_daily",
                     "irrigation_advisory_results", "analysis_result_payloads",
+                    "field_water_observations", "irrigation_history_coverage", "analysis_explanations",
                 }
                 rows = connection.execute(
                     "SELECT table_name FROM information_schema.tables WHERE table_schema=%s", (schema_name,)

@@ -13,6 +13,7 @@ from app.services.sickle.artifacts import ArtifactWriter
 from app.services.sickle.geometry import load_roi
 from app.services.sickle.providers.earth_engine import EarthEngineProvider
 from app.services.weather.earth_engine import EarthEngineWeatherProvider
+from app.services.explanation import OpenAIExplanationProvider
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,18 @@ async def lifespan(app):
     app.state.crop_runtime = None
     app.state.provider = None
     app.state.analysis_service = None
+    app.state.explanation_provider = OpenAIExplanationProvider(
+        settings.AI_EXPLANATION_API_KEY if settings.AI_EXPLANATION_ENABLED else None,
+        settings.AI_EXPLANATION_MODEL if settings.AI_EXPLANATION_ENABLED else None,
+        settings.AI_EXPLANATION_ENDPOINT,
+        settings.AI_EXPLANATION_TIMEOUT_SECONDS,
+    )
+    app.state.dependencies["ai_explanation"] = {
+        "ready": app.state.explanation_provider.enabled,
+        "required": False,
+        "provider": "openai-responses",
+        "model": settings.AI_EXPLANATION_MODEL,
+    }
     app.state.dependencies["database_schema"] = {"ready": False, "error": "Database schema has not been checked."}
     roi_checksum = None
     try:

@@ -4,7 +4,7 @@ import pytest
 
 from app.services.water.advisory import build_irrigation_advisory
 from app.services.water.balance import calculate_paddy_balance
-from app.services.water.contracts import DailyWeather, IrrigationDepth, WaterState
+from app.services.water.contracts import DailyWeather, IrrigationDepth, WaterObservation, WaterState
 from app.services.water.profiles import CAUVERY_PADDY_V1, PROFILE_METADATA
 from app.services.water.irrigation import normalize_irrigation
 
@@ -89,6 +89,11 @@ def test_near_term_rain_can_delay_but_never_create_negative_depth():
     assert result["action"] == "delay_for_rain"
     assert result["gross_depth_mm"] == 0
     assert result["volume_m3"] == 0
+    assert result["fallback_net_depth_mm"] == 8
+    assert result["fallback_gross_depth_mm"] == pytest.approx(13.333, abs=1e-3)
+    assert result["fallback_volume_m3"] == pytest.approx(13.333, abs=1e-3)
+    assert result["recommended_timing"] == "recheck_after_forecast_rain"
+    assert result["rule_version"] == "paddy-advisory-v2"
 
 
 def test_one_mm_over_one_hectare_is_exactly_ten_cubic_metres():
@@ -118,3 +123,47 @@ def test_runtime_profile_is_loaded_from_versioned_visible_resource():
     assert CAUVERY_PADDY_V1.version == PROFILE_METADATA["version"] == "cauvery-paddy-v1"
     assert CAUVERY_PADDY_V1.seepage_percolation_mm_day == PROFILE_METADATA["parameters"]["seepage_percolation_mm_day"]["value"]
     assert PROFILE_METADATA["sources"]
+
+
+def test_fao56_stress_coefficient_reduces_actual_etc_after_raw():
+    cycle_start = date(2025, 6, 1)
+    result = calculate_paddy_balance(
+        [DailyWeather(cycle_start, 0, 10)], [], CAUVERY_PADDY_V1, cycle_start,
+        initial_state=WaterState(80, 0), initial_state_source="measured",
+        cycle_start_source="transplanting_date", irrigation_history_complete=True,
+    )
+    row = result["daily"][0]
+    expected_ks = (100 - 80) / ((1 - row["depletion_fraction"]) * 100)
+    assert row["stress_coefficient"] == pytest.approx(expected_ks, abs=1e-6)
+    assert row["actual_etc_mm"] < row["potential_etc_mm"]
+    assert row["unmet_etc_mm"] > 0
+    assert abs(row["conservation_residual_mm"]) < 1e-6
+    assert result["rule_version"] == "paddy-daily-v2"
+
+
+def test_measured_ponding_is_assimilated_as_an_explicit_balanced_adjustment():
+    cycle_start = date(2025, 6, 1)
+    observation = WaterObservation(cycle_start, "ponded_depth", 30, reliability="high")
+    result = calculate_paddy_balance(
+        weather(1, et0=0), [], CAUVERY_PADDY_V1, cycle_start,
+        initial_state=WaterState(0, 10), irrigation_history_complete=True,
+        water_observations=[observation],
+    )
+    row = result["daily"][0]
+    assert row["ponded_water_mm"] == 30
+    assert row["state_adjustment_mm"] == 23
+    assert row["assimilated_observation_types"] == ["ponded_depth"]
+    assert abs(row["conservation_residual_mm"]) < 1e-6
+    assert result["evidence_level"] == "high"
+
+
+def test_validation_replay_can_disable_observation_assimilation():
+    cycle_start = date(2025, 6, 1)
+    observation = WaterObservation(cycle_start, "ponded_depth", 30, reliability="high")
+    result = calculate_paddy_balance(
+        weather(1, et0=0), [], CAUVERY_PADDY_V1, cycle_start,
+        initial_state=WaterState(0, 10), water_observations=[observation], assimilate_observations=False,
+    )
+    assert result["daily"][0]["ponded_water_mm"] == 7
+    assert result["daily"][0]["state_adjustment_mm"] == 0
+    assert result["assumptions"]["assimilation_enabled"] is False

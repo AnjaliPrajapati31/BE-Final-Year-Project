@@ -30,3 +30,28 @@ export const EmptyState = ({ title, description, icon: Icon }) => (
     <p className="text-sm text-slate-500 mt-1 max-w-sm mx-auto">{description}</p>
   </div>
 );
+
+export const StatusPill = ({ status }) => {
+  const tones = {
+    success: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    warning: 'border-amber-200 bg-amber-50 text-amber-700',
+    danger: 'border-red-200 bg-red-50 text-red-700',
+    neutral: 'border-slate-200 bg-slate-50 text-slate-600',
+  };
+  return <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${tones[status.tone] || tones.neutral}`}>{status.label}</span>;
+};
+
+export const InlineNotice = ({ title, description, tone = 'warning' }) => {
+  const tones = {
+    warning: 'border-amber-200 bg-amber-50 text-amber-900',
+    danger: 'border-red-200 bg-red-50 text-red-900',
+    info: 'border-sky-200 bg-sky-50 text-sky-900',
+    success: 'border-emerald-200 bg-emerald-50 text-emerald-900',
+  };
+  return (
+    <div className={`rounded-xl border px-4 py-3 text-sm ${tones[tone] || tones.warning}`}>
+      <div className="font-semibold">{title}</div>
+      {description && <div className="mt-0.5 text-xs opacity-80">{description}</div>}
+    </div>
+  );
+};

@@ -26,9 +26,10 @@ import {
   ShieldCheck,
   FileDown,
 } from 'lucide-react';
-import { EmptyState, LoadingSpinner, SectionHeader } from '../components/UIHelpers';
+import { EmptyState, LoadingSpinner, SectionHeader, StatusPill } from '../components/UIHelpers';
 import { useApp } from '../contexts/AppContext';
 import { ApiError, extractBoundaryPoints, getAnalysis } from '../services/api';
+import { presentError, presentModuleStatus, presentOverallStatus } from '../lib/presentation';
 
 const formatDate = (value) => {
   if (!value) return 'Not available';
@@ -70,6 +71,15 @@ const formatArea = (value) => {
     acres: `${acres.toFixed(2)} acres`,
   };
 };
+
+const moduleName = (name) => ({
+  crop: 'Crop identification',
+  growth_stage: 'Growth stage',
+  moisture_stress: 'Moisture stress',
+  weather: 'Weather evidence',
+  water_balance: 'Water balance',
+  irrigation_advisory: 'Irrigation advice',
+}[name] || name.replaceAll('_', ' '));
 
 export const Dashboard = () => {
   const location = useLocation();
@@ -169,10 +179,11 @@ export const Dashboard = () => {
   }
 
   if (error && !analysis) {
+    const message = presentError(error);
     return (
       <EmptyState
-        title={error.code || 'Analysis load failed'}
-        description={`${error.message}${error.requestId ? ` Request ID: ${error.requestId}` : ''}`}
+        title={message.title}
+        description={message.message}
         icon={AlertTriangle}
       />
     );
@@ -216,7 +227,7 @@ export const Dashboard = () => {
           </div>
           <div className="rounded-xl bg-slate-50 p-4">
             <div className="text-xs font-bold uppercase tracking-wider text-slate-500">Status</div>
-            <div className="mt-1 font-semibold text-slate-900">{analysis?.status || 'Not available'}</div>
+            <div className="mt-1 font-semibold text-slate-900">{presentOverallStatus(analysis?.status)}</div>
           </div>
         </div>
       </div>
@@ -225,11 +236,8 @@ export const Dashboard = () => {
         <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <div>
-            <div className="font-semibold">{error.message}</div>
-            <div className="text-xs text-amber-700">
-              {error.code}
-              {error.requestId ? ` · Request ID ${error.requestId}` : ''}
-            </div>
+            <div className="font-semibold">{presentError(error).title}</div>
+            <div className="text-xs text-amber-700">{presentError(error).message}</div>
           </div>
         </div>
       )}
@@ -242,6 +250,20 @@ export const Dashboard = () => {
               <li key={warning}>• {warning}</li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {analysis?.modules && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          <div className="mb-3 text-sm font-bold text-slate-900">Analysis sections</div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {Object.entries(analysis.modules).map(([name, module]) => (
+              <div key={name} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2.5">
+                <span className="text-xs font-semibold text-slate-700">{moduleName(name)}</span>
+                <StatusPill status={presentModuleStatus(module?.status)} />
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -322,7 +344,7 @@ export const Dashboard = () => {
               <div>
                 <h3 className="text-base font-bold text-slate-900 font-serif">Crop Type Identification</h3>
                 <p className="text-xs text-slate-500">
-                  {analysis?.provider?.name || 'Unknown provider'} · {analysis?.status || 'unknown'}
+                  {analysis?.provider?.live_data ? 'Live satellite observations' : 'Stored satellite observations'}
                 </p>
               </div>
             </div>
@@ -357,7 +379,7 @@ export const Dashboard = () => {
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-slate-900 font-serif">Crop Growth Stage</h3>
-                  <p className="text-xs text-slate-500">{stage?.status || 'not_available'}</p>
+                  <p className="text-xs text-slate-500">{presentModuleStatus(stage?.status).label}</p>
                 </div>
               </div>
               <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-full text-xs font-bold">
@@ -370,7 +392,7 @@ export const Dashboard = () => {
                 {stage?.stage || 'Growth stage not available'}
               </h4>
               <p className="text-xs text-emerald-800 font-semibold">
-                Status: {stage?.reason_code || stage?.status || 'Not available'}
+                {stage?.status === 'completed' ? 'Stage estimate available' : 'Stage estimate needs more usable observations'}
               </p>
 
               <div className="grid grid-cols-2 gap-3 text-xs text-slate-700 pt-1">

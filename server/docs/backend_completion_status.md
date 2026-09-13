@@ -42,6 +42,6 @@ An optional on-demand AI explanation endpoint is implemented after the determini
 
 Remaining external gate: ingest measured observations for the five-field validation set and freeze any scientifically justified parameter changes as a new profile version.
 
-## Stage 9 — Frontend
+## Stage 9 — Functional frontend contract
 
-Intentionally deferred. The existing frontend only received lint/build compatibility fixes. Water-profile editing, irrigation-event entry, water charts, and advisory display must not be prioritized until Stage 5 measured validation is complete.
+Complete at the functional, pre-redesign level. The UI now displays friendly module and error states without exposing backend reason codes, loads the selected analysis across routes, renders stored weather and daily water-deficit charts, shows deterministic irrigation depth/volume/timing/reason/evidence, and supports water-profile, irrigation-history, and field-water-observation entry. The optional AI explanation control is readiness-gated and cannot open while AI mode is disabled. Visual redesign remains intentionally separate from these stable API and state contracts.

@@ -1,0 +1,96 @@
+.delta-experience {
+  --paper: #f5f1e5; --ink: #142119; --line: #f5f1e540; --accent: #d8c98f;
+  position: relative; min-height: 1080vh; isolation: isolate; background: #17251b; color: var(--paper);
+  font-family: 'Inter', Arial, sans-serif; -webkit-font-smoothing: antialiased;
+}
+.delta-experience * { box-sizing: border-box; }
+.delta-experience a { color: inherit; text-decoration: none; }
+.delta-experience button { color: inherit; font: inherit; }
+.delta-experience :is(a,button):focus-visible { outline: 2px solid #f5dfb2; outline-offset: 6px; }
+.delta-viewport { position: sticky; top: 0; height: 100vh; overflow: hidden; z-index: 0; background: radial-gradient(circle at 65% 25%, #798675, #1c3022 72%); }
+.delta-stage { position: absolute; inset: 0; }
+.delta-stage canvas { display: block; width: 100%; height: 100%; }
+.delta-shade,.delta-topshade { position: absolute; inset: 0; pointer-events: none; }
+.delta-shade { background: linear-gradient(90deg, #08150dde 0%, #0c1b1194 30%, transparent 60%), linear-gradient(0deg, #07140dbd, transparent 38%); }
+.delta-topshade { background: linear-gradient(180deg, #0b17106b, transparent 24%); }
+
+.delta-header { position: absolute; inset: 0 0 auto; z-index: 10; display: flex; justify-content: space-between; align-items: center; padding: 28px 42px; gap: 24px; }
+.delta-brand { display: inline-flex; align-items: center; gap: 10px; font-size: 21px; font-weight: 500; letter-spacing: -.7px; }
+.delta-brand svg { width: 35px; height: 35px; }.delta-brand sup { font-size: 8px; margin-left: 3px; }
+.delta-location { margin: 0; font-size: 8px; letter-spacing: 2.4px; opacity: .75; }
+.delta-exit { display: inline-flex; align-items: center; gap: 10px; font-size: 10px; }
+.delta-story { position: relative; z-index: 3; margin-top: -100vh; }
+.delta-cover,.delta-chapter { position: relative; min-height: 120vh; padding: 0 6.5vw; }
+.delta-cover { display: flex; align-items: flex-end; padding-bottom: 14vh; }
+.delta-cover-copy { width: min(740px, 84vw); }
+.delta-eyebrow { display: flex; align-items: center; gap: 12px; margin: 0 0 23px; font-size: 8px; letter-spacing: 2.3px; line-height: 1.5; }
+.delta-eyebrow > span { width: 30px; height: 1px; background: currentColor; opacity: .7; }
+.delta-cover h1,.delta-error h1 { margin: 0; font: 400 clamp(68px, 8vw, 126px)/.94 'Playfair Display', Georgia, serif; letter-spacing: -.06em; }
+.delta-cover h1 em { font-weight: 400; }
+.delta-cover-copy > p:not(.delta-eyebrow) { max-width: 380px; margin: 28px 0; font-size: 12px; line-height: 1.75; opacity: .78; }
+.delta-cover-copy > button { display: flex; align-items: center; gap: 24px; border: 0; background: transparent; padding: 0; cursor: pointer; }
+.delta-cover-copy > button span { display: grid; place-items: center; width: 50px; height: 50px; border: 1px solid #fff8; border-radius: 50%; }
+.delta-scroll-cue { position: absolute; right: 5vw; bottom: 13vh; display: flex; align-items: center; gap: 12px; font-size: 8px; letter-spacing: 1.5px; writing-mode: vertical-rl; }
+.delta-scroll-cue span { width: 1px; height: 45px; background: currentColor; }
+
+.delta-chapter { display: grid; grid-template-columns: minmax(320px, 530px) 1fr; align-items: start; gap: 8vw; }
+.delta-chapter-card { position: sticky; top: 21vh; align-self: start; opacity: 0; transform: translateY(30px); filter: blur(4px); transition: opacity .5s, transform .7s, filter .6s; }
+.delta-chapter.is-active .delta-chapter-card { opacity: 1; transform: none; filter: none; }
+.delta-chapter-count { display: flex; align-items: center; gap: 13px; margin-bottom: 48px; font-size: 9px; letter-spacing: 1.5px; }
+.delta-chapter-count i { width: 62px; height: 1px; background: #fff7; }.delta-chapter-count b { font-weight: 400; opacity: .45; }
+.delta-chapter h2 { max-width: 540px; margin: 0 0 26px; font: 400 clamp(48px, 5.4vw, 88px)/.98 'Playfair Display', Georgia, serif; letter-spacing: -.05em; }
+.delta-chapter h2:focus { outline: none; }
+.delta-chapter-copy { max-width: 470px; margin: 0; font-size: clamp(13px, 1.1vw, 16px); line-height: 1.75; color: #f3f0e5d6; }
+.delta-tags { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 24px; }
+.delta-tags span { padding: 7px 10px; border: 1px solid #fff4; border-radius: 999px; background: #1020164d; font-size: 8px; letter-spacing: 1px; text-transform: uppercase; }
+.delta-qualification { max-width: 460px; padding-left: 16px; border-left: 1px solid #d8c98f9c; margin: 23px 0 0; font-size: 10px; line-height: 1.65; opacity: .72; }
+.delta-open { display: inline-flex; align-items: center; gap: 14px; margin-top: 28px; padding-bottom: 7px; border-bottom: 1px solid #fff7; font-size: 11px; }
+
+.delta-graphic { position: sticky; top: 29vh; justify-self: end; width: min(28vw, 390px); aspect-ratio: 1; opacity: 0; transition: opacity .7s; pointer-events: none; border: 1px solid #f6f0d934; background: linear-gradient(145deg,#0b17119c,#17281a4d); backdrop-filter: blur(8px); }
+.delta-chapter.is-active .delta-graphic { opacity: .8; }
+.delta-graphic :is(i,b,small,span) { position: absolute; display: block; font-style: normal; font-weight: 400; }
+.parcel-shape { inset: 20% 18%; border: 1px solid #eee4b9; clip-path: polygon(8% 17%,82% 5%,96% 72%,61% 96%,4% 76%); background: #78905c24; }
+.scan { left: 4%; width: 92%; height: 1px; background: linear-gradient(90deg,transparent,#d8eee5,transparent); transform: rotate(-11deg); box-shadow: 0 0 13px #d7f6ff; }.scan-a { top: 36%; }.scan-b { top: 65%; }
+.delta-graphic small { padding: 5px 7px; border: 1px solid #fff4; font-size: 7px; letter-spacing: 1.4px; }.delta-graphic small:first-of-type { left: 8%; bottom: 8%; }.delta-graphic small:last-of-type { right: 8%; bottom: 8%; }
+.season-line,.timeline { left: 11%; right: 11%; top: 62%; height: 1px; background: #e8ddb889; }
+.plant-mark { bottom: 38%; width: 3px; height: calc(70px * var(--plant)); background: #dce5b2; transform-origin: bottom; }.plant-mark::before,.plant-mark::after { content:''; position:absolute; bottom:30%; width:20px; height:1px; background:#dce5b2; transform-origin:0 50%; }.plant-mark::before { transform:rotate(-47deg); }.plant-mark::after { transform:rotate(227deg); }
+.plant-mark:nth-of-type(2){left:18%}.plant-mark:nth-of-type(3){left:39%}.plant-mark:nth-of-type(4){left:61%}.plant-mark:nth-of-type(5){left:82%}
+.evidence-patch { left:45%; top:31%; width:25%; height:23%; border-radius:47% 55% 39% 62%; background:#d89a4a66; filter:blur(3px); }
+.cloud-mark { left:24%; top:23%; width:45%; height:15%; border:1px solid #dce7df; border-radius:50%; border-bottom-color:transparent; }
+.rain-mark { top:44%; width:1px; height:28%; background:linear-gradient(#cbe4dc,transparent); transform:rotate(12deg); }.rain-mark:nth-of-type(1){left:30%}.rain-mark:nth-of-type(2){left:42%}.rain-mark:nth-of-type(3){left:54%}.rain-mark:nth-of-type(4){left:66%}
+.et-mark { right:12%; bottom:12%; font-size:12px; letter-spacing:2px; color:#eeddaa; }
+.soil-profile { left:15%; right:15%; top:25%; bottom:17%; border-top:8px solid #6f874d; background:linear-gradient(#493e27 0 36%,#313b2b 36% 70%,#202b28 70%); overflow:hidden; }.soil-profile i { left:20%; top:0; width:1px; height:68%; background:#d8c98f66; }.soil-profile i:nth-child(2){left:50%}.soil-profile i:nth-child(3){left:80%}
+.balance-arrow { font-size:8px; letter-spacing:1px; text-transform:uppercase; }.balance-arrow.in { left:9%; top:10%; }.balance-arrow.out { right:7%; bottom:7%; }
+.delta-graphic--irrigation { display:flex; align-items:center; justify-content:center; gap:10px; padding:8%; }.delta-graphic--irrigation :is(span,i) { position:static; }.decision-step { padding:12px 9px; border:1px solid #fff5; font-size:8px; letter-spacing:.8px; }
+.timeline-point { top:calc(62% - 4px); width:8px; height:8px; border-radius:50%; border:1px solid #eadfb9; background:#18261a; }.timeline-point:nth-of-type(2){left:13%}.timeline-point:nth-of-type(3){left:31%}.timeline-point:nth-of-type(4){left:50%}.timeline-point:nth-of-type(5){left:69%}.timeline-point:nth-of-type(6){left:87%}
+.hero-shape { inset:17%; background:#d7c7871b; box-shadow:inset 0 0 30px #d7c78730; }.pin-mark { left:49%; top:41%; width:10px; height:10px; border-radius:50% 50% 50% 0; border:1px solid #fff; transform:rotate(-45deg); }.delta-graphic--field > span { bottom:9%; left:0; right:0; text-align:center; font-size:8px; letter-spacing:2px; text-transform:uppercase; }
+
+.delta-rail { position: absolute; z-index: 12; top: 50%; right: 35px; transform: translateY(-50%); display: grid; gap: 9px; }
+.delta-rail button { display: flex; align-items: center; justify-content: flex-end; gap: 9px; width: 40px; border: 0; background: transparent; padding: 2px; cursor: pointer; opacity: .4; }
+.delta-rail button span { font-size: 7px; }.delta-rail button i { width: 8px; height: 1px; background: currentColor; transition: width .35s; }
+.delta-rail button.is-active { opacity: 1; }.delta-rail button.is-active i { width: 20px; }
+.delta-progress { position: absolute; z-index: 11; left: 42px; bottom: 30px; width: min(260px, 25vw); height: 1px; background: #fff3; --progress: 0; }
+.delta-progress span { display: block; width: 100%; height: 1px; background: var(--paper); transform: scaleX(var(--progress)); transform-origin: left; }
+.delta-controls { position: absolute; z-index: 12; right: 42px; bottom: 24px; display: flex; align-items: center; gap: 18px; }
+.delta-controls button { display: flex; align-items: center; gap: 8px; border: 0; background: transparent; padding: 6px; font-size: 9px; cursor: pointer; opacity: .78; }
+.delta-wind-label { position: absolute; z-index: 11; left: 45px; top: 92px; display: flex; gap: 8px; align-items: center; font-size: 8px; opacity: .62; }
+
+.delta-loader,.delta-error { position: absolute; inset: 0; z-index: 20; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #17251b; }
+.delta-loader { gap: 14px; font: 28px Georgia, serif; }.delta-loader small { font: 8px Arial,sans-serif; letter-spacing: 2px; opacity: .65; }.delta-loader-line { width: 58px; height: 1px; background: #eee4bd; animation: delta-load 1.5s ease-in-out infinite alternate; }
+.delta-error { align-items: flex-start; padding: 12vw; }.delta-error h1 { max-width: 700px; font-size: 65px; }.delta-error > p:not(.delta-eyebrow) { max-width: 450px; line-height: 1.7; }
+.delta-error button,.delta-error a { display: inline-flex; align-items: center; gap: 10px; margin-top: 16px; border: 0; background: none; padding: 5px 0; }
+@keyframes delta-load { from { transform: scaleX(.12); opacity: .25; } to { transform: scaleX(1); opacity: 1; } }
+
+@media (max-width: 800px) {
+  .delta-experience { min-height: 960vh; }.delta-header { padding: 20px; }.delta-location,.delta-rail,.delta-wind-label { display: none; }
+  .delta-brand { font-size: 17px; }.delta-brand svg { width: 29px; }.delta-exit { font-size: 0; }
+  .delta-cover,.delta-chapter { min-height: 108vh; padding-left: 24px; padding-right: 24px; }
+  .delta-cover { padding-bottom: 18vh; }.delta-cover h1 { font-size: clamp(58px, 16vw, 80px); }
+  .delta-chapter { grid-template-columns: 1fr; }.delta-chapter-card { top: 17vh; }.delta-chapter h2 { font-size: clamp(46px, 13vw, 68px); }
+  .delta-graphic { display: none; }.delta-controls { right: 18px; bottom: 18px; }.delta-controls button:first-child { font-size: 0; }
+  .delta-progress { left: 24px; bottom: 26px; width: 34vw; }.delta-scroll-cue { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .delta-experience * { scroll-behavior: auto !important; animation: none !important; transition: none !important; }
+  .delta-chapter-card { opacity: 1; filter: none; transform: none; }
+}

@@ -71,20 +71,10 @@ function pulse(progress, center, width = .16) {
 }
 
 function updateStoryLayers(layers, progress) {
-  layers.scan.material.opacity = pulse(progress, .12, .095) * .78;
-  const growthOpacity = pulse(progress, .24, .095);
-  layers.growth.material.opacity = growthOpacity * .82;
-  layers.growthNodes.material.opacity = growthOpacity;
-  layers.stress.material.opacity = pulse(progress, .36, .095) * .25;
-  layers.rain.material.opacity = pulse(progress, .49, .10) * .68;
-  layers.balance.material.opacity = pulse(progress, .62, .10) * .78;
-  layers.advice.material.opacity = pulse(progress, .74, .10) * .92;
-  const evidenceOpacity = pulse(progress, .86, .095);
-  layers.evidence.material.opacity = evidenceOpacity * .78;
-  layers.evidenceNodes.material.opacity = evidenceOpacity;
+  layers.scan.material.opacity = pulse(progress, .35, .2) * .78;
   layers.scan.scale.setScalar(.9 + progress * .55);
-  layers.balance.rotation.z = progress * Math.PI * .35;
 }
+
 
 export function createLandscape(host, { reducedMotion, onReady, onError, onQuality, onProgress }) {
   let disposed = false, frame = 0, running = true;

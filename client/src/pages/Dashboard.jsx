@@ -193,7 +193,7 @@ export const Dashboard = () => {
     <div className="space-y-6 font-sans text-slate-800 pb-12">
       <SectionHeader
         title="Crop Analytics Overview"
-        subtitle={`Stored FastAPI analysis for ${analysis?.field_id || fieldId || 'selected field'}`}
+        // subtitle={`Stored FastAPI analysis for ${analysis?.field_id || fieldId || 'selected field'}`}
         action={
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center space-x-2 bg-emerald-50 border border-emerald-200 text-emerald-800 px-3.5 py-1.5 rounded-full text-xs font-bold shadow-2xs">
@@ -211,7 +211,7 @@ export const Dashboard = () => {
         }
       />
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-5">
+      {/* <div className="rounded-2xl border border-slate-200 bg-white p-5">
         <div className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-900">
           <Info className="h-4 w-4 text-slate-600" />
           <span>Analysis Summary</span>
@@ -230,7 +230,7 @@ export const Dashboard = () => {
             <div className="mt-1 font-semibold text-slate-900">{presentOverallStatus(analysis?.status)}</div>
           </div>
         </div>
-      </div>
+      </div> */}
 
       {error && (
         <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
@@ -588,7 +588,7 @@ export const Dashboard = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl p-6 border border-emerald-200/80 shadow-xs space-y-4">
+        {/* <div className="bg-white rounded-2xl p-6 border border-emerald-200/80 shadow-xs space-y-4">
           <div className="flex items-center gap-2 text-base font-bold text-slate-900 font-serif">
             <FileDown className="w-5 h-5 text-emerald-700" />
             <span>Artifacts and Provenance</span>
@@ -632,10 +632,10 @@ export const Dashboard = () => {
               <div className="mt-1 text-sm font-semibold text-slate-900">No artifacts stored for this run.</div>
             )}
           </div>
-        </div>
-      </div>
+        </div>*/}
+      </div> 
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+      {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         <div className="bg-white rounded-2xl p-6 border border-emerald-200/80 shadow-xs flex items-center justify-between hover:shadow-md transition-all">
           <div className="flex items-center space-x-4">
             <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0 shadow-xs">
@@ -680,7 +680,7 @@ export const Dashboard = () => {
             View History
           </Link>
         </div>
-      </div>
+      </div> */}
     </div>
   );
 };

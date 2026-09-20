@@ -1,7 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { DashboardLayout } from '../layouts/DashboardLayout';
-import { Home } from '../pages/Home';
 import { MyFields } from '../pages/MyFields';
 import { Dashboard } from '../pages/Dashboard';
 import { WaterStress } from '../pages/WaterStress';
@@ -16,17 +15,25 @@ const Experience = lazy(() => import('../pages/experience/Experience'));
 export const AppRoutes = () => {
   return (
     <Routes>
-      <Route
-        path="/experience"
-        element={(
-          <Suspense fallback={<div className="min-h-screen bg-[#17261e]" aria-label="Preparing the landscape" />}>
-            <Experience />
-          </Suspense>
-        )}
-      />
-      <Route path="/" element={<DashboardLayout />}>
-        {/* 1. Home Landing Page */}
-        <Route index element={<Home />} />
+      <Route element={<DashboardLayout />}>
+        <Route
+          path="/"
+          element={(
+            <Suspense fallback={<div className="min-h-screen bg-[#17261e]" aria-label="Preparing the landscape" />}>
+              <Experience />
+            </Suspense>
+          )}
+        />
+        <Route
+          path="/experience"
+          element={(
+            <Suspense fallback={<div className="min-h-screen bg-[#17261e]" aria-label="Preparing the landscape" />}>
+              <Experience />
+            </Suspense>
+          )}
+        />
+
+
         
         {/* 2. My Fields Page (Interactive GIS Map + Polygon Drawing) */}
         <Route path="fields" element={<MyFields />} />

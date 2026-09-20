@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import time
+from datetime import date, timedelta
 from pathlib import Path
 
 import numpy as np
@@ -159,7 +160,10 @@ class EarthEngineProvider:
     def detailed_series(self, geometry: ValidatedGeometry, year: int, request_id: str) -> list[DetailedObservation]:
         ee = self._require_ready()
         region = ee.Geometry(mapping(geometry.geometry))
-        start, end = f"{year}-01-01", f"{year + 1}-01-01"
+        start = date(year, 1, 1)
+        end = date(year + 1, 1, 1)
+        if year == date.today().year:
+            end = date.today() + timedelta(days=1)
         reducer = ee.Reducer.median().combine(ee.Reducer.stdDev(), sharedInputs=True).combine(ee.Reducer.count(), sharedInputs=True)
 
         def s1_feature(image):
@@ -174,8 +178,8 @@ class EarthEngineProvider:
             return ee.Feature(None, values).set({"date": image.date().format("YYYY-MM-dd"), "source_image_id": image.id(), "scene_cloud_percentage": image.get("CLOUDY_PIXEL_PERCENTAGE")})
 
         with ee.data.workloadTagContext(request_id):
-            s1 = (ee.ImageCollection("COPERNICUS/S1_GRD").filterBounds(region).filterDate(start, end).filter(ee.Filter.eq("instrumentMode", "IW")).filter(ee.Filter.listContains("transmitterReceiverPolarisation", "VV")).filter(ee.Filter.listContains("transmitterReceiverPolarisation", "VH")).map(s1_feature).getInfo())
-            s2 = ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED").filterBounds(region).filterDate(start, end).map(s2_feature).getInfo()
+            s1 = (ee.ImageCollection("COPERNICUS/S1_GRD").filterBounds(region).filterDate(start.isoformat(), end.isoformat()).filter(ee.Filter.eq("instrumentMode", "IW")).filter(ee.Filter.listContains("transmitterReceiverPolarisation", "VV")).filter(ee.Filter.listContains("transmitterReceiverPolarisation", "VH")).map(s1_feature).getInfo())
+            s2 = ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED").filterBounds(region).filterDate(start.isoformat(), end.isoformat()).map(s2_feature).getInfo()
         output = []
         for sensor, collection in (("S1", s1), ("S2", s2)):
             for feature in collection.get("features", []):

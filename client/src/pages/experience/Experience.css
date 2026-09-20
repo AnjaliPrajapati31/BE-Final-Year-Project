@@ -1,6 +1,6 @@
 .delta-experience {
   --paper: #f5f1e5; --ink: #142119; --line: #f5f1e540; --accent: #d8c98f;
-  position: relative; min-height: 1080vh; isolation: isolate; background: #17251b; color: var(--paper);
+  position: relative; min-height: 300vh; isolation: isolate; background: #17251b; color: var(--paper);
   font-family: 'Inter', Arial, sans-serif; -webkit-font-smoothing: antialiased;
 }
 .delta-experience * { box-sizing: border-box; }
@@ -20,7 +20,7 @@
 .delta-location { margin: 0; font-size: 8px; letter-spacing: 2.4px; opacity: .75; }
 .delta-exit { display: inline-flex; align-items: center; gap: 10px; font-size: 10px; }
 .delta-story { position: relative; z-index: 3; margin-top: -100vh; }
-.delta-cover,.delta-chapter { position: relative; min-height: 120vh; padding: 0 6.5vw; }
+.delta-cover,.delta-chapter { position: relative; height: 100vh; padding: 0 6.5vw; }
 .delta-cover { display: flex; align-items: flex-end; padding-bottom: 14vh; }
 .delta-cover-copy { width: min(740px, 84vw); }
 .delta-eyebrow { display: flex; align-items: center; gap: 12px; margin: 0 0 23px; font-size: 8px; letter-spacing: 2.3px; line-height: 1.5; }
@@ -33,8 +33,8 @@
 .delta-scroll-cue { position: absolute; right: 5vw; bottom: 13vh; display: flex; align-items: center; gap: 12px; font-size: 8px; letter-spacing: 1.5px; writing-mode: vertical-rl; }
 .delta-scroll-cue span { width: 1px; height: 45px; background: currentColor; }
 
-.delta-chapter { display: grid; grid-template-columns: minmax(320px, 530px) 1fr; align-items: start; gap: 8vw; }
-.delta-chapter-card { position: sticky; top: 21vh; align-self: start; opacity: 0; transform: translateY(30px); filter: blur(4px); transition: opacity .5s, transform .7s, filter .6s; }
+.delta-chapter { display: grid; grid-template-columns: minmax(320px, 530px) 1fr; align-items: center; gap: 8vw; }
+.delta-chapter-card { align-self: center; opacity: 0; transform: translateY(30px); filter: blur(4px); transition: opacity .5s, transform .7s, filter .6s; }
 .delta-chapter.is-active .delta-chapter-card { opacity: 1; transform: none; filter: none; }
 .delta-chapter-count { display: flex; align-items: center; gap: 13px; margin-bottom: 48px; font-size: 9px; letter-spacing: 1.5px; }
 .delta-chapter-count i { width: 62px; height: 1px; background: #fff7; }.delta-chapter-count b { font-weight: 400; opacity: .45; }
@@ -46,7 +46,8 @@
 .delta-qualification { max-width: 460px; padding-left: 16px; border-left: 1px solid #d8c98f9c; margin: 23px 0 0; font-size: 10px; line-height: 1.65; opacity: .72; }
 .delta-open { display: inline-flex; align-items: center; gap: 14px; margin-top: 28px; padding-bottom: 7px; border-bottom: 1px solid #fff7; font-size: 11px; }
 
-.delta-graphic { position: sticky; top: 29vh; justify-self: end; width: min(28vw, 390px); aspect-ratio: 1; opacity: 0; transition: opacity .7s; pointer-events: none; border: 1px solid #f6f0d934; background: linear-gradient(145deg,#0b17119c,#17281a4d); backdrop-filter: blur(8px); }
+.delta-graphic { justify-self: end; width: min(28vw, 390px); aspect-ratio: 1; opacity: 0; transition: opacity .7s; pointer-events: none; border: 1px solid #f6f0d934; background: linear-gradient(145deg,#0b17119c,#17281a4d); backdrop-filter: blur(8px); }
+
 .delta-chapter.is-active .delta-graphic { opacity: .8; }
 .delta-graphic :is(i,b,small,span) { position: absolute; display: block; font-style: normal; font-weight: 400; }
 .parcel-shape { inset: 20% 18%; border: 1px solid #eee4b9; clip-path: polygon(8% 17%,82% 5%,96% 72%,61% 96%,4% 76%); background: #78905c24; }
@@ -82,11 +83,11 @@
 @keyframes delta-load { from { transform: scaleX(.12); opacity: .25; } to { transform: scaleX(1); opacity: 1; } }
 
 @media (max-width: 800px) {
-  .delta-experience { min-height: 960vh; }.delta-header { padding: 20px; }.delta-location,.delta-rail,.delta-wind-label { display: none; }
+  .delta-experience { min-height: 300vh; }.delta-header { padding: 20px; }.delta-location,.delta-rail,.delta-wind-label { display: none; }
   .delta-brand { font-size: 17px; }.delta-brand svg { width: 29px; }.delta-exit { font-size: 0; }
-  .delta-cover,.delta-chapter { min-height: 108vh; padding-left: 24px; padding-right: 24px; }
+  .delta-cover,.delta-chapter { height: 100vh; padding-left: 24px; padding-right: 24px; }
   .delta-cover { padding-bottom: 18vh; }.delta-cover h1 { font-size: clamp(58px, 16vw, 80px); }
-  .delta-chapter { grid-template-columns: 1fr; }.delta-chapter-card { top: 17vh; }.delta-chapter h2 { font-size: clamp(46px, 13vw, 68px); }
+  .delta-chapter { grid-template-columns: 1fr; }.delta-chapter-card { align-self: center; }.delta-chapter h2 { font-size: clamp(46px, 13vw, 68px); }
   .delta-graphic { display: none; }.delta-controls { right: 18px; bottom: 18px; }.delta-controls button:first-child { font-size: 0; }
   .delta-progress { left: 24px; bottom: 26px; width: 34vw; }.delta-scroll-cue { display: none; }
 }

@@ -10,12 +10,6 @@ const clamp = value => Math.min(1, Math.max(0, value));
 function ChapterGraphic({ id }) {
   const content = {
     crop: <><i className="scan scan-a" /><i className="scan scan-b" /><b className="parcel-shape" /><small>S1</small><small>S2</small></>,
-    growth: <><i className="season-line" />{[.28,.48,.72,1].map((scale, index) => <b key={index} className="plant-mark" style={{ '--plant': scale, left: `${18 + index * 21}%` }} />)}</>,
-    stress: <><b className="parcel-shape" /><i className="evidence-patch" /><small>OPTICAL</small><small>RADAR</small></>,
-    weather: <><i className="cloud-mark" />{[0,1,2,3].map(index => <b key={index} className="rain-mark" />)}<i className="et-mark">ET₀ ↑</i></>,
-    balance: <><b className="soil-profile"><i /><i /><i /></b><span className="balance-arrow in">+ rain</span><span className="balance-arrow out">− crop use</span></>,
-    irrigation: <><span className="decision-step">deficit</span><i>→</i><span className="decision-step">efficiency</span><i>→</i><span className="decision-step">mm · m³</span></>,
-    evidence: <><i className="timeline" />{[0,1,2,3,4].map(index => <b key={index} className="timeline-point" />)}<small>SOURCE</small><small>ASSUMPTION</small></>,
     field: <><b className="parcel-shape hero-shape" /><i className="pin-mark" /><span>your boundary</span></>,
   }[id];
   return (
@@ -43,9 +37,15 @@ export default function Experience() {
     const progress = clamp(Number(rawProgress) || 0);
     worldRef.current?.setStoryProgress(progress);
     if (progressRef.current) progressRef.current.style.setProperty('--progress', progress);
-    const next = progress < .055 ? -1 : Math.min(7, Math.max(0, Math.round(progress * 8) - 1));
+    let next = -1;
+    if (progress >= 0.25 && progress < 0.75) {
+      next = 0;
+    } else if (progress >= 0.75) {
+      next = 1;
+    }
     setActive(previous => previous === next ? previous : next);
   }, []);
+
 
   useEffect(() => {
     let cancelled = false;
@@ -132,14 +132,6 @@ export default function Experience() {
         <div className="delta-shade" aria-hidden="true" />
         <div className="delta-topshade" aria-hidden="true" />
 
-        <header className="delta-header">
-          <Link to="/" className="delta-brand" aria-label="CropSense home">
-            <svg viewBox="0 0 36 36" fill="none" aria-hidden="true"><path d="M7 25V13l11-6 11 6v12l-11 6L7 25Z" stroke="currentColor" strokeWidth="1.1"/><path d="m12 22 6-3 6 3M12 17l6-3 6 3M18 14v11" stroke="currentColor" strokeWidth="1.1"/></svg>
-            <span>CropSense<sup>®</sup></span>
-          </Link>
-          <p className="delta-location">ILLUSTRATIVE AGRICULTURAL VALLEY</p>
-          <Link to="/" className="delta-exit">Back to app <ArrowUpRight size={15} /></Link>
-        </header>
 
         <nav className="delta-rail" aria-label="Story chapters">
           {STORY_CHAPTERS.map((chapter, index) => (
@@ -151,7 +143,8 @@ export default function Experience() {
 
         <div className="delta-progress" ref={progressRef} aria-hidden="true"><span /></div>
         <div className="delta-controls">
-          <button onClick={() => goTo(7, true)}>Skip to field view <ArrowDown size={15} /></button>
+          <button onClick={() => goTo(STORY_CHAPTERS.length - 1, true)}>Skip to field view <ArrowDown size={15} /></button>
+
           <button onClick={toggleMotion} aria-label={calm ? 'Resume environmental motion' : 'Pause environmental motion'} aria-pressed={calm}>{calm ? <Play size={16} /> : <Pause size={16} />}</button>
           <button onClick={enterFullScreen} aria-label="Toggle full screen"><Maximize2 size={16} /></button>
         </div>

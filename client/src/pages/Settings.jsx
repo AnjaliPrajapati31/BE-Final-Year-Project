@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ClipboardCheck, Droplets, Gauge, Sliders } from 'lucide-react';
 import { EmptyState, InlineNotice, LoadingSpinner, SectionHeader } from '../components/UIHelpers';
 import { useApp } from '../contexts/AppContext';
@@ -152,6 +152,10 @@ export const Settings = () => {
       />
       <InlineNotice title="Why these inputs matter" description="Measured irrigation and water depth improve evidence. Leaving them unknown is safer than entering an estimated zero." tone="info" />
       {notice && <InlineNotice title={notice.title} description={notice.message} tone={notice.tone} />}
+      <div className="rounded-xl border border-emerald-200 bg-white p-4 text-sm">
+        <p>Saved records improve the next analysis. Previously saved results remain unchanged.</p>
+        <Link className="quiet-button mt-3" to="/fields">Run a new analysis with these records →</Link>
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <FormCard icon={Sliders} title="Water profile" description="Optional field-specific values. Blank fields continue using visible versioned defaults.">

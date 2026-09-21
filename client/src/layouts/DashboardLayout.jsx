@@ -1,35 +1,12 @@
 import { Outlet, useLocation } from 'react-router-dom';
 import { Navbar } from '../components/Navbar';
-
+import { RouteTransition } from '../components/RouteTransition';
+import { ResultsShell } from '../components/ResultsShell';
+import '../styles/journey.css';
+const resultRoutes = new Set(['/dashboard', '/analytics', '/water-stress', '/weather', '/recommendations', '/settings', '/history']);
 export const DashboardLayout = () => {
-  const location = useLocation();
-  const isHomePage = location.pathname === '/' || location.pathname === '/experience';
-
-  return (
-    <div className={`min-h-screen flex flex-col font-sans antialiased relative ${
-      isHomePage ? 'bg-[#17251b] text-white' : 'bg-[#E8F5E9] text-slate-900'
-    }`}>
-      {!isHomePage && (
-        <div
-          className="fixed inset-0 z-0 bg-cover bg-center bg-no-repeat pointer-events-none opacity-70"
-          style={{ backgroundImage: "url('/fyp-bg.png')" }}
-        />
-      )}
-      <div className="relative z-10 flex-1 flex flex-col w-full">
-        {/* Top Navigation Bar with Home, My Field, Analytics, Water Stress */}
-        <Navbar />
-
-        {/* Page Content — Home page handles its own full-bleed layout; inner pages get padding */}
-        <main className="flex-1 w-full">
-          {isHomePage ? (
-            <Outlet />
-          ) : (
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-              <Outlet />
-            </div>
-          )}
-        </main>
-      </div>
-    </div>
-  );
+  const { pathname } = useLocation();
+  return <RouteTransition><div className="workspace"><Navbar/>
+    <main>{resultRoutes.has(pathname) ? <ResultsShell><Outlet/></ResultsShell> : <Outlet/>}</main>
+  </div></RouteTransition>;
 };

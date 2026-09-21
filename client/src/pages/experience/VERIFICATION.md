@@ -1,42 +1,33 @@
-# CropSense experience verification
+# Three-step journey verification
 
-Date: 2026-09-18
+Date: 2026-09-21
 
-## Measured configuration
+## Executed checks
 
-- Browser: Chromium in the Codex in-app browser (development build).
-- Viewport: 1280 x 720 CSS pixels.
-- Device pixel ratio: 2; renderer cap: 1.5.
-- Hardware/GPU identity: unavailable from the test surface.
-- Scene sample after warm-up: 64.5 fps, 60 draw calls, 510,984 triangles, 12,090 rice instances.
-- Production chunks: experience UI 52.40 kB / 19.92 kB gzip; lazy renderer 582.61 kB / 149.39 kB gzip.
+- Client: `node --test src/lib/journey.test.js` — 5 tests passed (circle coverage, supported GeoJSON normalization, invalid geometry shapes/values, approximate area, stale field/run rejection, explicit daily gaps).
+- Client: `npm run lint` — passed.
+- Client: `npm run build` — passed. Vite reports large chunks; this is not a runtime performance measurement.
+- Server: `.venv\\Scripts\\python.exe -m pytest tests/unit/test_coverage.py tests/unit/test_api_contract.py -q -p no:cacheprovider` — 10 passed. Existing Starlette/httpx deprecation warning remains.
+- Coverage tests assert loaded geometry/checksum and reject absent or unverified coverage.
 
-The measured frame rate is above both the automatic quality-reduction threshold of 30 fps and the 60 fps target on this test surface. It is a development-browser measurement, not a guarantee for other hardware.
+## Production bundle sample
 
-## Verified
+Before the final small cleanup, build reported: home UI 2.60 kB (1.15 kB gzip), lazy map 161.55 kB (48.08 kB gzip), lazy renderer 576.50 kB (148.36 kB gzip), main application 848.55 kB (263.52 kB gzip). These are JavaScript bundle sizes, not total network payload or graphics performance.
 
-- Direct navigation and refresh at `/experience`.
-- Native scroll moves the camera and story; stopping scroll holds scene progress.
-- Programmatic chapter jumps and restored scroll position derive the same scene state from document progress.
-- Reverse movement is stateless; no accumulated camera animation is used.
-- Opening, crop chapter, final aerial, and direct-overhead compositions were inspected.
-- The direct-overhead view contains 48 reproducible parcels with exclusive centroid ownership and a valid hero parcel.
-- The cultivated world continues beyond the final camera view; there is no exposed rectangular landscape plate.
-- Shared parcel edges generate both surfaces and low earthen bunds; the canal is recessed and banked.
-- Rice placement is constrained to parcel interiors and excludes bund/canal margins.
-- Aerial rice uses deterministic strata across the full valley instead of random thinning or the former partial bounds.
-- Palms use deterministic ecological clusters distributed over the canal range, with deliberate gaps and a protected foreground camera area.
-- Every chapter has a distinct reversible scene treatment and a feature-specific explanatory diagram.
-- Reduced-motion emulation reports the expected media query and zero-second text transitions.
-- No analysis or field-write request is initiated by the route.
-- ESLint and production build pass.
-- Runtime console inspection found no application errors.
+## Not performed
 
-## Not claimed as tested
+No servers or browser sessions were started, as requested. No new comparison screenshots, runtime console inspection, network capture, frame-time measurement or GPU profiling was performed. Historical screenshots and frame rates do not validate this revision.
 
-- A physical touch device and orientation sensor.
-- Forced WebGL context creation failure (the HTML fallback path exists but was not fault-injected).
-- GPU memory profiling across long repeated-route sessions.
-- Safari or Firefox rendering parity.
+Pending browser/device acceptance:
 
-These checks should remain explicit rather than being marked complete without a real device or fault-injection run.
+- Ground composition against the supplied dense-field screenshot; light, canopy continuity, bank/farmer grounding and tree placement.
+- Pointer/keyboard transition, focus, rapid activation, slow route load, Back and route exit.
+- Empty map, drawing/undo/finish/clear/upload, coverage failure/retry, tile errors and preserved drafts.
+- Complete Paddy, Non-Paddy, missing weather, forecast-only weather, missing advice and partial failures.
+- Direct links, refresh, changing stored runs and consistent field identity across every tab.
+- Record saving followed by a new analysis; disabled AI staying unavailable.
+- Mobile panels/touch/orientation, reduced motion, forced WebGL failure and repeated route disposal.
+- Network check for absence of analysis/field writes until explicit submission.
+- Actual desktop/mobile frame times, hardware/GPU, viewport and resource cleanup.
+
+Visual acceptance remains pending; do not describe the revised landscape as screenshot-matched or performance-certified.

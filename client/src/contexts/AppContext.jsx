@@ -1,15 +1,8 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useState } from 'react';
+import { readFieldDraft } from '../lib/journey';
 
 const AppContext = createContext();
-
-// Default polygon points (Cauvery Delta sample)
-const DEFAULT_BOUNDARY_POINTS = [
-  { lat: 10.7850, lng: 79.1350 },
-  { lat: 10.7910, lng: 79.1350 },
-  { lat: 10.7910, lng: 79.1420 },
-  { lat: 10.7850, lng: 79.1420 },
-];
 
 export const AppProvider = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -19,8 +12,8 @@ export const AppProvider = ({ children }) => {
   });
   const [notificationsCount, setNotificationsCount] = useState(3);
   const [searchQuery, setSearchQuery] = useState('');
-  const [fieldBoundaryPoints, setFieldBoundaryPoints] = useState(DEFAULT_BOUNDARY_POINTS);
-  const [fieldDisplayName, setFieldDisplayName] = useState('Thanjavur Delta Sector A');
+  const [fieldBoundaryPoints, setFieldBoundaryPoints] = useState([]);
+  const [fieldDisplayName, setFieldDisplayName] = useState(() => readFieldDraft().name || '');
   const [fieldId, setFieldId] = useState(() => localStorage.getItem('cropsense.fieldId') || '');
   const [latestRequestId, setLatestRequestId] = useState(() => localStorage.getItem('cropsense.latestRequestId'));
   const [latestAnalysisSummary, setLatestAnalysisSummary] = useState(null);

@@ -292,9 +292,24 @@ class AnalysisRepository:
             cursor.execute("SELECT artifact_type,mime_type,size_bytes,sha256 FROM analysis_artifacts WHERE request_id=%s ORDER BY artifact_type", (request_id,))
             return list(cursor.fetchall())
 
-    def history(self, field_code: str, limit: int, offset: int) -> list[dict]:
+    def history(self, field_code: str | None, limit: int, offset: int) -> list[dict]:
+        """List finished analyses, optionally limited to one field.
+
+        A field-specific history is still useful inside a field workspace, but
+        the application must be able to discover existing runs after a fresh
+        browser visit where no field is selected.
+        """
         with self.pool.connection() as connection, connection.cursor(row_factory=dict_row) as cursor:
-            cursor.execute("""SELECT ar.request_id,ar.status,ar.started_at,ar.completed_at,fr.revision_number,cr.class_label,cr.confidence,sr.stage,sr.evidence FROM fields f JOIN field_revisions fr ON fr.field_id=f.id JOIN analysis_runs ar ON ar.field_revision_id=fr.id LEFT JOIN crop_results cr ON cr.request_id=ar.request_id LEFT JOIN stage_results sr ON sr.request_id=ar.request_id WHERE f.field_code=%s AND ar.status IN ('completed','partial') ORDER BY ar.started_at DESC LIMIT %s OFFSET %s""", (field_code, limit, offset))
+            cursor.execute("""SELECT ar.request_id,ar.status,ar.started_at,ar.completed_at,
+                              f.field_code,fr.revision_number,cr.class_label,cr.confidence,sr.stage,sr.evidence
+                       FROM fields f
+                       JOIN field_revisions fr ON fr.field_id=f.id
+                       JOIN analysis_runs ar ON ar.field_revision_id=fr.id
+                       LEFT JOIN crop_results cr ON cr.request_id=ar.request_id
+                       LEFT JOIN stage_results sr ON sr.request_id=ar.request_id
+                       WHERE (%s::text IS NULL OR f.field_code=%s)
+                         AND ar.status IN ('completed','partial')
+                       ORDER BY ar.started_at DESC LIMIT %s OFFSET %s""", (field_code, field_code, limit, offset))
             return list(cursor.fetchall())
 
     def save_module_run(self, request_id: UUID, module: str, result: dict) -> None:

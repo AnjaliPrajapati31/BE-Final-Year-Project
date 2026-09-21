@@ -1,8 +1,9 @@
 import { CloudSun, Droplets, Info } from 'lucide-react';
-import { Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Bar, CartesianGrid, ComposedChart, Line, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { EmptyState, InlineNotice, LoadingSpinner, SectionHeader, StatusPill } from '../components/UIHelpers';
 import { useCurrentAnalysis } from '../hooks/useCurrentAnalysis';
 import { formatNumber, presentError, presentModuleStatus } from '../lib/presentation';
+import { fillDailyGaps } from '../lib/journey';
 
 export const Weather = () => {
   const { analysis, loading, error } = useCurrentAnalysis();
@@ -17,7 +18,7 @@ export const Weather = () => {
 
   const weather = analysis.weather;
   const module = analysis.modules?.weather;
-  if (!weather?.historical?.length) {
+  if (!weather?.historical?.length && !weather?.forecast?.length) {
     const state = presentModuleStatus(module?.status);
     return (
       <div className="space-y-6">
@@ -27,11 +28,11 @@ export const Weather = () => {
     );
   }
 
-  const rows = [
-    ...weather.historical.slice(-14).map((row) => ({ ...row, period: 'Observed estimate' })),
-    ...(weather.forecast || []).map((row) => ({ ...row, period: 'Forecast' })),
-  ];
-  const latest = weather.historical.at(-1);
+  const rows = fillDailyGaps([
+    ...(weather.historical || []).slice(-14).map((row) => ({ ...row, historicalRain: row.rainfall_mm, historicalEt0: row.et0_mm, period: 'Historical estimate' })),
+    ...(weather.forecast || []).map((row) => ({ ...row, forecastRain: row.rainfall_mm, forecastEt0: row.et0_mm, period: 'Forecast' })),
+  ]);
+  const latest = weather.historical?.at(-1);
 
   return (
     <div className="space-y-6">
@@ -63,8 +64,11 @@ export const Weather = () => {
               <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={(value) => value.slice(5)} />
               <YAxis tick={{ fontSize: 10 }} unit=" mm" />
               <Tooltip formatter={(value) => [`${Number(value).toFixed(1)} mm`]} />
-              <Bar dataKey="rainfall_mm" name="Rainfall" fill="#38bdf8" radius={[4, 4, 0, 0]} />
-              <Line dataKey="et0_mm" name="ET₀" stroke="#f59e0b" strokeWidth={2.5} dot={false} />
+              <Legend wrapperStyle={{ fontSize: 11 }}/>
+              <Bar dataKey="historicalRain" name="Historical rain" fill="#568c91" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="forecastRain" name="Forecast rain" fill="#bfd8d7" radius={[4, 4, 0, 0]} />
+              <Line dataKey="historicalEt0" name="Historical ET₀" stroke="#a68d4f" strokeWidth={2.5} dot={false} connectNulls={false}/>
+              <Line dataKey="forecastEt0" name="Forecast ET₀" stroke="#a68d4f" strokeDasharray="5 4" strokeWidth={2} dot={false} connectNulls={false}/>
             </ComposedChart>
           </ResponsiveContainer>
         </div>

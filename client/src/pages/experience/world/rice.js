@@ -11,7 +11,7 @@ function plantGeometry(detailed) {
     texcoords.push(...ua, ...ub, ...uc);
     parts.push(part, part, part);
   }
-  const leaves = detailed ? 6 : 3;
+  const leaves = detailed ? 8 : 5;
   const segments = detailed ? 7 : 3;
   for (let leaf = 0; leaf < leaves; leaf++) {
     const azimuth = leaf * 2.399;
@@ -81,12 +81,23 @@ export function createRice(scene, shared, compact) {
       const variation = parcel.variation;
       // One plant cluster per deterministic stratum keeps aerial canopy coverage
       // spatially even. Jitter changes the silhouette, never the coverage map.
-      const period = compact ? 27 : 18 + Math.floor(variation * 5);
+      const period = distance < 75 ? (compact ? 4 : 2) : (compact ? 27 : 18 + Math.floor(variation * 5));
       const stratum = Math.abs(column * 13 + row * 7 + parcel.row * 5 + parcel.column * 3) % period;
       if (!detailed && stratum !== 0) continue;
       const height = (.74 + rng() * .30) * (.83 + variation * .26);
       (detailed ? near : far).push(px, pz, height, parcel.rowAngle + (rng() - .5) * .18);
       (detailed ? nearShade : farShade).push(.16 + variation * .45 + rng() * .24);
+    }
+  }
+  const closeStep = compact ? .62 : .43;
+  for (let z = -14; z < 30; z += closeStep) {
+    for (let x = -22; x < 26; x += closeStep) {
+      const px = x + (rng() - .5) * closeStep * .6, pz = z + (rng() - .5) * closeStep * .6;
+      if (Math.hypot(px - 3, pz - 10) > 23) continue;
+      const parcel = parcelAt(px, pz);
+      if (!parcel || distanceToParcelBoundary(px, pz, parcel) < .65 || isCanal(px, pz, .4)) continue;
+      near.push(px, pz, .84 + rng() * .32, parcel.rowAngle + (rng() - .5) * 1.2);
+      nearShade.push(.24 + parcel.variation * .36 + rng() * .2);
     }
   }
   const material = new THREE.ShaderMaterial({
@@ -102,7 +113,7 @@ export function createRice(scene, shared, compact) {
     geometry.setAttribute('aPlant', new THREE.InstancedBufferAttribute(new Float32Array(data), 4));
     geometry.setAttribute('aShade', new THREE.InstancedBufferAttribute(new Float32Array(shade), 1));
     geometry.instanceCount = shade.length;
-    geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, -35), 230);
+    geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, -95), 360);
     const mesh = new THREE.Mesh(geometry, material);
     mesh.name = detail ? 'Near rice: curved blades and grain panicles' : 'Far rice: simplified living canopy';
     scene.add(mesh);

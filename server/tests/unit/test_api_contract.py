@@ -28,6 +28,7 @@ def test_required_public_routes_exist():
     paths = app.openapi()["paths"]
     assert "/api/v1/fields/analyze" in paths
     assert "/api/v1/analyses/{request_id}" in paths
+    assert "/api/v1/analyses" in paths
     assert "/api/v1/fields/{field_id}/analyses" in paths
     assert "/api/v1/fields/{field_id}/irrigation-events" in paths
     assert "/api/v1/fields/{field_id}/water-profile" in paths

@@ -1,43 +1,42 @@
-# CropSense Landscape Storyboard v2
+# CropSense visual contract — v3
 
-## Visual contract
+## 1. Living field
 
-The experience follows one illustrative paddy parcel through the CropSense decision flow. It uses a level cultivated valley, gently rising margins, and distant ridges for atmospheric depth. The scene is not a reconstruction of a real location and never displays invented analysis results.
+Match the user's older ground-level screenshot in composition: dense overlapping green rice leaves with modest gold heads in the foreground, continuous middle-distance canopy, a shallow canal toward the horizon, a small grounded farmer, margin palms and layered distant trees under a bright hazy sky.
 
-References are used for technique only: Anime.js for scroll-synchronised progression and restrained typography; Ghost of Tsushima's published environmental-effects discussion for coordinated wind; Three.js terrain, water, instancing, and level-of-detail examples for rendering structure. No third-party visual assets are included.
+The implementation adds local dense rice infill rather than uniformly increasing the entire valley, strengthens the distant tree line, fixes the home camera, and reduces the text shading. These are implemented changes, not a claim that visual matching has passed.
 
-## Composition frames
+Only brand, My fields, heading, short supporting copy, Analyze field and a discreet motion control belong on this screen. No chapter explanations, aerial destination, diagrams or simulated results.
 
-| Frame | Camera and composition | Required visual reading | Reject when |
-|---|---|---|---|
-| Ground | Low among detailed rice, canal leading into depth, farmer in middle distance | Rice, shallow water, connected bunds, valley and distant ridge layers | Nearby trees block the story, water reads as ocean, or field paths float |
-| Mid-rise | Hero parcel remains central while the camera clears the canopy | Connected unequal parcels, canal hierarchy, retained crop coverage | Crop vanishes into a smooth plane or chapter overlays hide the field |
-| Direct overhead QA | Temporary inspection pose, independent of final camera | Shared edges, no overlaps, no crossing or unconnected paths | Repeating square wallpaper, loose diagonal strokes, or material bleed |
-| Final aerial | Broad oblique view with the hero outline and complete valley | One readable landscape, real field-tool action, illustrative disclosure | Hero field disappears, parcel edges become wires, or hills imply actual geography |
+Reject sparse foreground gaps, floating banks/farmer, tree obstructions, excessive dark gradients, abrupt vegetation detail changes, or a canal that looks like an ocean.
 
-## Chapters
+## 2. Map workspace
 
-| Chapter | Camera | Scene layer | Copy purpose | Failure condition |
-|---|---|---|---|---|
-| Cover | Ground | Living rice, farmer, water and wind | Invite native scrolling | Timed autoplay begins without input |
-| Crop | Canopy | Hero outline and sensing ring | Explain Paddy / Non-Paddy gate | Suggests a real result for this scene |
-| Growth | Low rise | Seasonal context motif | Explain stage-dependent interpretation | Claims exact stage truth |
-| Stress | Held rise | Local amber evidence area | Explain persistent corroborated risk | Converts stress to deficit or irrigation |
-| Weather | Valley reveal | Rain points and atmospheric motion | Explain rainfall, ET0 and forecast | Presents coarse weather as a field gauge |
-| Water balance | Medium aerial | Water-accounting ring | Explain ponding, depletion and deficit | Hides missing irrigation or assumptions |
-| Irrigation | Wider aerial | Decision marker | Explain timing, depth, efficiency and volume | Implies AI sets water quantity |
-| Evidence | Stable aerial | Provenance graphic | Explain charts, warnings and evidence | Treats AI explanation as calculation |
-| Your field | Complete aerial | Persistent hero boundary | Move to the operational field tool | Displays invented selectable coordinates |
+Use a real interactive basemap with accurately named street/satellite layers. Start without a selected example. Draw approved coverage only from the backend response. Keep the boundary visible while submitting and preserve the draft on failure.
 
-## Interaction acceptance
+Desktop: map and approximately 360 px review panel. Mobile: map above collapsible tools, with a reachable submit action. Coverage is advisory; server validation remains authoritative.
 
-- Scroll position is the single narrative clock; stopping holds camera and overlays.
-- Reverse scrolling restores every prior state without replay artifacts.
-- Explore, chapter navigation, and Skip move to real semantic sections.
-- The page does not intercept the wheel or force snap positions.
-- Reduced motion preserves readable sections and removes animated transitions.
-- The story performs no backend reads, field writes, model execution, or chatbot calls.
+Reject fabricated coverage, blocked drawing surfaces, loss of the boundary on error, automatic timeout resubmission, or technical exception text as the main explanation.
 
-## Asset manifest
+## 3. Stored results
 
-All landscape geometry, materials, shaders, typography layouts, diagrams, and icons are locally authored or use existing project dependencies. Lucide icons are covered by its ISC license. No photographs, videos, game assets, downloaded models, audio, or generated raster images are included.
+Lead with field identity/freshness and the actual irrigation action or missing-information explanation, followed by crop/stage/stress/deficit summaries, evidence, warnings and expandable diagnostics.
+
+Contextual tabs keep the same request and field IDs. Loading another run must not show the preceding run's figures. Missing values are not zero. Saved records require a new analysis to affect results.
+
+## Transition acceptance
+
+The green reveal originates at the click position or keyboard button centre, covers the farthest corner, blocks repeated activation, then reveals the map shell without waiting for tiles. Reduced motion skips camera/text movement and uses immediate route transition. Back, route interruptions and failure recovery must not leave an overlay behind.
+
+## Asset-origin manifest
+
+| Asset | Origin | License / attribution |
+|---|---|---|
+| Rice, terrain, trees, farmer and canal geometry | Existing project procedural code plus local revisions | Repository ownership/license; no downloaded models |
+| Procedural canopy and environment materials | Project shader/code assets | Repository ownership/license |
+| Water rendering helper | Three.js dependency | MIT; retain dependency license |
+| UI icons | Existing Lucide dependency | ISC; retain dependency license |
+| GSAP transition | Installed GSAP dependency | Retain installed package license and applicable GSAP terms |
+| Reference screenshot | User-provided older project screenshot | Visual reference only; not embedded as a background |
+
+No game assets, stock video, generated raster artwork or new external models were introduced. Existing basemap providers retain their on-map attribution. Reference imagery establishes visual intent, not verification of the revised renderer.

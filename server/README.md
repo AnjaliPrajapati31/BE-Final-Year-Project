@@ -29,3 +29,9 @@ uv run python scripts/run_live_current.py
 ```
 
 `scripts/run_pilot.py` is the only fixture-backed end-to-end path. Public FastAPI requests cannot select it.
+
+To locate an existing completed Paddy run and print its stored dashboard URL without changing the database:
+
+```powershell
+uv run python scripts/inspect_saved_paddy.py
+```

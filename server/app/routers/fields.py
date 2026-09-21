@@ -25,6 +25,25 @@ from app.utils.response import success
 router = APIRouter(prefix="/api/v1", tags=["Field Analysis"])
 
 
+@router.get("/coverage")
+def approved_coverage(request: Request):
+    from shapely.geometry import mapping
+
+    roi = getattr(request.app.state, "roi", None)
+    readiness = getattr(request.app.state, "dependencies", {}).get("roi_resource", {})
+    if roi is None or not readiness.get("ready"):
+        raise DomainError("COVERAGE_UNAVAILABLE", "Coverage information is unavailable.", 503)
+    return success("Approved analysis coverage", {
+        "type": "Feature",
+        "geometry": mapping(roi),
+        "properties": {
+            "version": settings.CAUVERY_ROI_VERSION,
+            "sha256": readiness.get("sha256"),
+            "note": "Boundary coverage does not guarantee patch fit or satellite availability.",
+        },
+    })
+
+
 def _service(request: Request):
     service = request.app.state.analysis_service
     if service is None:
@@ -171,6 +190,13 @@ def generate_analysis_explanation(request_id: UUID, command: ExplanationRequest,
 def field_history(request: Request, field_id: str, limit: int = Query(20, ge=1, le=100), offset: int = Query(0, ge=0)):
     items = _repository(request).history(field_id, limit, offset)
     return success("Field analysis history retrieved", {"items": items, "limit": limit, "offset": offset})
+
+
+@router.get("/analyses")
+def recent_history(request: Request, limit: int = Query(50, ge=1, le=100), offset: int = Query(0, ge=0)):
+    """Discover stored completed/partial runs when no active field is known."""
+    items = _repository(request).history(None, limit, offset)
+    return success("Recent stored analyses retrieved", {"items": items, "limit": limit, "offset": offset})
 
 
 @router.put("/fields/{field_id}/water-profile")

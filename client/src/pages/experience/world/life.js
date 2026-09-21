@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { randomSequence } from './landscape';
+import { randomSequence, canalCenter } from './landscape';
 
 function limb(start, end, radius, material, group) {
   const direction = new THREE.Vector3().subVectors(end, start);
@@ -41,7 +41,7 @@ export function createFarmer(scene) {
   // A folded shoulder towel breaks the silhouette and provides small wind motion.
   const towel = new THREE.Mesh(new THREE.PlaneGeometry(.085, .40, 3, 8), cloth);
   towel.position.set(-.115, 1.23, .115); farmer.add(towel);
-  farmer.position.set(-1.4, .055, -11);
+  farmer.position.set(canalCenter(-11) - 3.1, .16, -11);
   farmer.rotation.y = -.18;
   scene.add(farmer);
   return { farmer, towel };

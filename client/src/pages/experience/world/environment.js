@@ -203,6 +203,22 @@ export function createTrees(scene, compact) {
   });
   stems.castShadow = false; crowns.castShadow = false;
   scene.add(stems, crowns);
+  // Broken, layered foliage along the far field margin restores horizon depth.
+  const foliageGeometry = new THREE.IcosahedronGeometry(1, 1);
+  const foliageMaterial = new THREE.MeshStandardMaterial({ color: '#526843', roughness: 1, flatShading: false });
+  const foliage = new THREE.InstancedMesh(foliageGeometry, foliageMaterial, compact ? 90 : 156);
+  for (let i = 0; i < foliage.count; i++) {
+    const cluster = Math.floor(i / 3);
+    const x = -260 + cluster * (520 / (foliage.count / 3)) + (rng() - .5) * 8;
+    const z = -291 - rng() * 24;
+    const height = 3.5 + rng() * 4;
+    dummy.position.set(x, terrainHeight(x, z) + height * .6, z);
+    dummy.rotation.set(rng() * .25, rng() * 6.28, rng() * .2);
+    dummy.scale.set(3 + rng() * 3.5, height, 2.5 + rng() * 3);
+    dummy.updateMatrix(); foliage.setMatrixAt(i, dummy.matrix);
+    foliage.setColorAt(i, new THREE.Color().setHSL(.25, .18 + rng() * .15, .15 + rng() * .09));
+  }
+  scene.add(foliage);
   const update = (time, still) => {
     entries.forEach((entry, index) => {
       const sway = still ? 0 : Math.sin(time * .6 + entry.phase) * .018;

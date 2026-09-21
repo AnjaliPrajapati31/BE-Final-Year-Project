@@ -103,7 +103,13 @@ export const getFieldHistory = async (fieldId, { limit = 20, offset = 0 } = {}) 
   }),
 );
 
+export const getRecentAnalyses = async ({ limit = 50, offset = 0 } = {}) => unwrapEnvelope(
+  api.get('/api/v1/analyses', { params: { limit, offset } }),
+);
+
 export const getHealth = async () => unwrapEnvelope(api.get('/health'));
+
+export const getCoverage = async () => unwrapEnvelope(api.get('/api/v1/coverage'));
 
 export const getReadiness = async () => unwrapEnvelope(api.get('/health/ready'));
 

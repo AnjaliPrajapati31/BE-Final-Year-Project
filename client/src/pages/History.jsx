@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, Calendar, CheckCircle2, Database, ArrowRight } from 'lucide-react';
+import { AlertTriangle, Calendar, CheckCircle2, ArrowRight } from 'lucide-react';
 import { EmptyState, LoadingSpinner, SectionHeader } from '../components/UIHelpers';
-import { useApp } from '../contexts/AppContext';
-import { ApiError, getFieldHistory } from '../services/api';
+import { ApiError, getFieldHistory, getRecentAnalyses } from '../services/api';
 import { presentError, presentOverallStatus } from '../lib/presentation';
 
 const formatDateTime = (value) => {
@@ -19,22 +18,21 @@ const formatDateTime = (value) => {
 
 export const History = () => {
   const [searchParams] = useSearchParams();
-  const { fieldId: contextFieldId } = useApp();
-  const fieldId = searchParams.get('fieldId') || contextFieldId;
+  // The standalone History link must discover saved runs even when local
+  // browser state still points to a different/old field. Result tabs and the
+  // field workspace pass fieldId explicitly when a field-specific view is wanted.
+  const fieldId = searchParams.get('fieldId') || '';
   const [history, setHistory] = useState([]);
-  const [loading, setLoading] = useState(Boolean(fieldId));
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!fieldId) {
-      return;
-    }
     let cancelled = false;
     const load = async () => {
       setLoading(true);
       setError(null);
       try {
-        const result = await getFieldHistory(fieldId);
+        const result = fieldId ? await getFieldHistory(fieldId) : await getRecentAnalyses();
         if (!cancelled) {
           setHistory(result.items || []);
         }
@@ -54,16 +52,6 @@ export const History = () => {
     };
   }, [fieldId]);
 
-  if (!fieldId) {
-    return (
-      <EmptyState
-        title="No field selected"
-        description="Run an analysis first so the dashboard can load analysis history for a field code."
-        icon={Database}
-      />
-    );
-  }
-
   if (loading) {
     return <LoadingSpinner />;
   }
@@ -82,8 +70,8 @@ export const History = () => {
   return (
     <div className="space-y-6">
       <SectionHeader
-        title="Field Analysis History"
-        subtitle={`Stored completed and partial analyses for ${fieldId}`}
+        title={fieldId ? 'Field Analysis History' : 'Saved analyses'}
+        subtitle={fieldId ? `Stored completed and partial analyses for ${fieldId}` : 'Completed and partial analyses saved across your fields'}
         action={
           history.length > 0 ? (
             <div className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700">
@@ -93,14 +81,16 @@ export const History = () => {
         }
       />
 
+      {fieldId && <Link className="inline-flex text-sm font-semibold text-emerald-700 hover:text-emerald-800" to="/history">View all saved analyses →</Link>}
+
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200/80 text-slate-500 text-xs font-semibold uppercase tracking-wider">
                 <th className="py-3.5 px-4">Started</th>
-                <th className="py-3.5 px-4">Request ID</th>
-                <th className="py-3.5 px-4">Revision</th>
+                <th className="py-3.5 px-4">Field</th>
+                <th className="py-3.5 px-4">Boundary version</th>
                 <th className="py-3.5 px-4">Crop</th>
                 <th className="py-3.5 px-4">Stage</th>
                 <th className="py-3.5 px-4">Status</th>
@@ -113,10 +103,10 @@ export const History = () => {
                   <td className="py-3.5 px-4 font-mono text-xs text-slate-600">{formatDateTime(item.started_at)}</td>
                   <td className="py-3.5 px-4 text-xs font-semibold text-slate-900">
                     <Link
-                      to={`/dashboard?requestId=${encodeURIComponent(item.request_id)}&fieldId=${encodeURIComponent(fieldId)}`}
+                      to={`/dashboard?requestId=${encodeURIComponent(item.request_id)}&fieldId=${encodeURIComponent(item.field_code)}`}
                       className="text-emerald-700 hover:text-emerald-800"
                     >
-                      {item.request_id}
+                      {(item.field_code || fieldId).replaceAll('_', ' ')}
                     </Link>
                   </td>
                   <td className="py-3.5 px-4 font-medium text-slate-700">v{item.revision_number}</td>
@@ -133,7 +123,7 @@ export const History = () => {
                   </td>
                   <td className="py-3.5 px-4">
                     <Link
-                      to={`/dashboard?requestId=${encodeURIComponent(item.request_id)}&fieldId=${encodeURIComponent(fieldId)}`}
+                      to={`/dashboard?requestId=${encodeURIComponent(item.request_id)}&fieldId=${encodeURIComponent(item.field_code)}`}
                       className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 transition hover:border-emerald-400"
                     >
                       <span>Full Analysis</span>
@@ -149,8 +139,8 @@ export const History = () => {
 
       {!loading && history.length === 0 && (
         <EmptyState
-          title="No stored analyses yet"
-          description="This field code has no completed or partial analyses in PostgreSQL yet."
+          title={fieldId ? 'No stored analyses for this field' : 'No stored analyses yet'}
+          description={fieldId ? 'This field has no saved analyses yet. Select its boundary to start one.' : 'Run an analysis to create the first saved field record.'}
           icon={Calendar}
         />
       )}

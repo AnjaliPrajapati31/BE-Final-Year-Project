@@ -32,9 +32,9 @@ export const presentError = (error, fallback = 'Something went wrong. Please try
 };
 
 export const presentModuleStatus = (status) => ({
-  completed: { label: 'Available', tone: 'success' },
-  skipped: { label: 'Not needed', tone: 'neutral' },
-  insufficient_data: { label: 'Needs more data', tone: 'warning' },
+  completed: { label: 'Ready', tone: 'success' },
+  skipped: { label: 'Not applicable', tone: 'neutral' },
+  insufficient_data: { label: 'More information needed', tone: 'warning' },
   failed: { label: 'Could not complete', tone: 'danger' },
 }[status] || { label: 'Not available', tone: 'neutral' });
 

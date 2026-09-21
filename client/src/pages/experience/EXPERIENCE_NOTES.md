@@ -1,21 +1,20 @@
-# Cinematic Farm Experience
+# CropSense three-step journey — v3
 
-`/experience` is a lazy-loaded, scroll-controlled design preview. Native page scroll drives one deterministic story position from zero to one. The Three.js renderer derives camera, fog, vegetation detail, hero-field emphasis, and explanatory scene layers from that value; it owns no competing travel timer.
+The application has three workflow steps: home `/`, field selection `/fields`, and stored results `/dashboard?requestId=…&fieldId=…`. The old eight-chapter story has been removed. `/experience` redirects home; `/analytics` remains supported.
 
 ## Architecture
 
-- `story.js` is the source of truth for the eight chapters and their scientifically qualified copy.
-- `Experience.jsx` provides semantic sections, chapter navigation, reduced-motion behavior, and Anime.js ScrollObserver synchronization.
-- `world/landscape.js` owns the fixed parcel topology, point-in-polygon checks, boundary distance, terrain height, hero parcel, and chapter camera poses.
-- The renderer exposes `setStoryProgress`, `setQuality`, `setAmbientMotion`, `resize`, and `dispose`.
-- Parcel surfaces, physical bunds, crop placement, and the hero outline all derive from the same 48 polygons.
+- Experience.jsx renders one living-field viewport with ambient movement, pause, reduced-motion behavior and a lightweight illustration if graphics fail.
+- world/renderer.js owns one static home camera, shared wind, scene lifecycle and adaptive quality. No scroll ascent or scientific overlays remain.
+- RouteTransition.jsx preloads the map, covers the viewport with a GSAP circle from the pointer (button centre for keyboard), navigates, fades out and transfers focus. Loading has a bounded timeout; remote tiles do not block revealing the map shell.
+- MyFields.jsx starts without a sample polygon, preserves a session draft, supports drawing and a single Polygon GeoJSON upload, and retrieves the approved coverage geometry.
+- GET /api/v1/coverage exposes the verified ROI already loaded by the backend. It does not replace server geometry, patch or satellite validation.
+- useCurrentAnalysis.js validates request and field identity before showing results and deduplicates simultaneous reads.
+- ResultsShell.jsx supplies contextual result tabs. Existing record, history and analysis APIs remain unchanged.
+- Optional AI explanation is hidden unless readiness explicitly enables it.
 
-## Product boundary
+## Boundaries
 
-The final chapter links to `/fields`. The preview does not read an operational ROI, claim selectable coordinates, call an analysis API, save a field, or invoke the chatbot. A later real-map integration must retrieve the active coverage boundary and retain server-side geometry and patch validation.
+The home landscape is illustrative, not a georeferenced field or scientific result. Scientific models, irrigation calculations and database schemas are unchanged. The home itself does not trigger analysis. An explicit Run analysis submits the selected boundary; timed-out requests are never automatically resubmitted.
 
-## Rendering and fallback
-
-The scene uses procedural terrain, a mostly level cultivated valley, rising margins, distant ridges, shallow canal water, instanced rice, bank-aligned palms, atmospheric haze, and a shared wind field. Pixel ratio is capped and quality reduces progressively when measured performance is low. A renderer failure leaves the complete HTML story and field-tool navigation available.
-
-See `STORYBOARD.md` for chapter compositions, visual references, rejection criteria, and the asset manifest.
+See STORYBOARD.md for the visual contract and asset origins, and VERIFICATION.md for measured versus pending checks.

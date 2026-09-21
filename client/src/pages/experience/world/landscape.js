@@ -91,14 +91,4 @@ export function isCanal(x, z, margin = 0) {
   return Math.abs(x - canalCenter(z)) < 2.35 + margin;
 }
 
-export const CAMERA_KEYS = [
-  { position: [2.5, 1.85, 20], target: [-5, 1.1, -25], fov: 53 },
-  { position: [0, 3.6, 13], target: [-12, .7, -28], fov: 51 },
-  { position: [-7, 7, 13], target: [-17, 0, -33], fov: 50 },
-  { position: [-12, 13, 18], target: [-20, 0, -37], fov: 49 },
-  { position: [-2, 25, 25], target: [-25, 0, -42], fov: 48 },
-  { position: [11, 43, 31], target: [-25, 0, -48], fov: 47 },
-  { position: [20, 67, 38], target: [-24, 0, -52], fov: 46 },
-  { position: [28, 91, 43], target: [-18, 0, -56], fov: 45 },
-  { position: [35, 120, 50], target: [-10, 0, -58], fov: 44 },
-];
+export const HOME_CAMERA = { position: [2.5, 1.85, 20], target: [-5, 1.1, -25], fov: 53 };
